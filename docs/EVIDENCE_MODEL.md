@@ -2,80 +2,151 @@
 
 ## Status
 
-Proposed evidence model for the controlled M1 experiment.
+Implemented for the controlled M1 fixture.
 
-Verdict names and report fields are not a stable public API.
+Verdict names, outcomes, precedence, and report fields remain preliminary and are not a stable public API.
 
 ## Purpose
 
-The model records what was executed and what was observed.
+The model records what was constructed, executed, and observed.
 
-It does not establish complete correctness, production readiness, security, or complete regression protection.
+It does not establish complete correctness, production readiness, security, complete regression protection, or compatibility with arbitrary repositories.
 
 ## Repository identity
 
-Every execution state must record exact base and head commit SHAs.
+Every controlled scenario records deterministic base and head commit SHAs.
 
-Symbolic refs may later be accepted as input, but they must be resolved before execution.
+State identity is verified before execution results are interpreted.
 
 ## State A: base baseline
 
 State A contains the exact base implementation and base tests.
 
-A passing State A means only that the selected command passed on the base state.
+When State A does not pass, State B tests and State C execution are skipped.
 
 ## State B: head
 
 State B contains the exact head implementation and head tests.
 
-A passing State B does not show that changed tests distinguish the old behavior.
+Passing State B does not by itself show that changed tests distinguish previous behavior.
 
-## State C: base plus head test envelope
+When State B does not pass, State C is not constructed.
 
-State C contains the base implementation plus only explicitly approved test changes from head.
+## State C: base plus selected head test
 
-The experiment must record included paths, excluded changed paths, and the resulting hybrid diff.
+State C starts from the exact base commit and receives only:
 
-## Positive observation requirements
+```text
+test/qualifies-for-free-shipping.test.js
+```
 
-State C must discover and execute the intended regression test.
+Boundary validation confirms:
 
-It must fail at the intended assertion rather than during import, build, setup, configuration, dependency resolution, timeout, or infrastructure execution.
+- State C is based on base;
+- its implementation matches base;
+- its selected test matches head;
+- its diff contains only the selected test path.
 
-A non-zero exit code alone is insufficient evidence.
+## State outcomes
 
-## Execution outcomes
+- `PASS` - expected passing TAP summary observed.
+- `TEST_ASSERTION_FAILURE` - named regression test executed and failed at the expected assertion.
+- `INCONCLUSIVE` - evidence did not satisfy a stronger confirmed state contract.
+- `NOT_RUN` - fail-fast orchestration skipped the state.
 
-- PASS: the command completed successfully.
-- TEST_ASSERTION_FAILURE: the intended test executed and its assertion failed.
-- BUILD_OR_LOAD_FAILURE: the test suite could not load or compile.
-- CONFIGURATION_FAILURE: required test configuration was missing or incompatible.
-- DEPENDENCY_FAILURE: required dependencies were unavailable.
-- TIMEOUT: the execution exceeded its time limit.
-- PROCESS_FAILURE: the process failed outside a confirmed test assertion.
-- TOOL_OPERATIONAL_ERROR: the experiment itself failed.
+Process evidence also records exit code, signal, timeout, process errors, TAP checks, named-test detection, and invalid-failure classification.
 
-An operational error is not a product verdict.
+## Positive observation
 
-## Preliminary positive verdict
+`OBSERVED_TEST_DISCRIMINATION` requires:
 
-OBSERVED_TEST_DISCRIMINATION requires:
+- State A: `PASS`;
+- State B: `PASS`;
+- State C: `TEST_ASSERTION_FAILURE`;
+- intended regression test executed;
+- expected assertion mismatch observed;
+- valid State C boundary;
+- no operational failure.
 
-- State A: PASS;
-- State B: PASS;
-- State C: TEST_ASSERTION_FAILURE;
-- confirmation that the intended changed test executed;
-- successful hybrid boundary validation.
+A non-zero exit code alone is insufficient.
 
-This means only that the selected test envelope distinguished base and head in the recorded environment.
+## Aggregate verdicts
 
-## Other preliminary verdicts
+### `OBSERVED_TEST_DISCRIMINATION`
 
-- NON_DISCRIMINATING_TESTS: States A, B, and C pass.
-- HEAD_FAILED: State B does not pass.
-- BASELINE_FAILED: State A does not pass.
-- INCONCLUSIVE: valid evidence could not be produced.
+State A and State B pass, State C reaches the expected assertion failure, and the hybrid boundary is valid.
+
+### `NON_DISCRIMINATING_TESTS`
+
+State A, State B, and State C pass.
+
+### `HEAD_FAILED`
+
+State A passes, but State B does not pass. State C is not constructed.
+
+### `BASE_FAILED`
+
+State A does not pass. State B tests and State C execution are not run.
+
+### `INVALID_TEST_ENVELOPE`
+
+State A and State B pass, but State C boundary evidence is invalid.
+
+### `OPERATIONAL_ERROR`
+
+The experiment encounters an operational exception or invalid process failure.
+
+Operational errors are not behavioral evidence.
+
+### `INCONCLUSIVE`
+
+The evidence does not match a stronger valid verdict.
+
+## Current verdict precedence
+
+The controlled evaluator applies:
+
+1. `OPERATIONAL_ERROR`;
+2. `BASE_FAILED`;
+3. `HEAD_FAILED`;
+4. `INVALID_TEST_ENVELOPE`;
+5. `OBSERVED_TEST_DISCRIMINATION`;
+6. `NON_DISCRIMINATING_TESTS`;
+7. `INCONCLUSIVE`.
+
+## Fail-fast behavior
+
+- State A executes first.
+- If State A does not pass, State B and State C receive `NOT_RUN`.
+- If State A passes, State B executes.
+- If State B does not pass, State C receives `NOT_RUN`.
+- State C is constructed only after State A and State B pass.
+
+## Manifest boundary
+
+The controlled JSON manifest records:
+
+- schema and experiment identity;
+- selected test path;
+- scenario counts and overall status;
+- deterministic repository SHAs;
+- changed paths;
+- state SHAs and outcomes;
+- boundary evidence;
+- cleanup evidence;
+- expected and actual verdicts;
+- verification checks.
+
+Raw TAP output is not part of the manifest.
 
 ## Determinism requirement
 
-The controlled fixture must reproduce the same commit identities, hybrid paths, execution outcomes, failing test name, and failure category across at least five consecutive executions.
+The fixture must reproduce identical commit identities, state relationships, hybrid paths, outcomes, verdicts, normalized manifest, and runner output.
+
+The current implementation passed this requirement across five consecutive end-to-end executions.
+
+## Evidence limitation
+
+Positive evidence applies only to the recorded fixture, commits, selected test path, command, environment, and outcomes.
+
+It is not proof of complete correctness or evidence that the method generalizes to another repository.
