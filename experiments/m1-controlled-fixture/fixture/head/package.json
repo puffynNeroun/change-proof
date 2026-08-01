@@ -1,0 +1,8 @@
+{
+  "name": "change-proof-m1-base-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-reporter=tap"
+  }
+}
