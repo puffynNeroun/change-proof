@@ -1,37 +1,106 @@
 import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { spawnSync } from "node:child_process";
+  copyFile,
+  mkdir,
+  mkdtemp,
+  rm,
+} from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const requiredPathNames = [
+import {
+  runBoundedCommand,
+} from "../../src/core/run-bounded-command.mjs";
+import {
+  classifyExpectedNodeTestRegression,
+  classifyNodeTestExecution,
+} from "../../src/core/classify-node-test.mjs";
+import {
+  createGitRepositoryPrimitives,
+} from "../../src/core/git-repository-primitives.mjs";
+import {
+  createOwnedWorkspaceLifecycle,
+} from "../../src/core/owned-workspace-lifecycle.mjs";
+import {
+  createExplicitEnvelopeMaterializer,
+} from "../../src/core/materialize-explicit-envelope.mjs";
+import {
+  evaluateEvidence,
+} from "../../src/core/evaluate-evidence.mjs";
+
+const SELECTED_TEST_PATH =
+  "test/qualifies-for-free-shipping.test.js";
+const SOURCE_PATH =
+  "src/qualifies-for-free-shipping.js";
+const COMMAND_TIMEOUT_MS = 10_000;
+const OUTPUT_LIMIT_BYTES = 1024 * 1024;
+const WORKSPACE_PREFIX =
+  "change-proof-m1-state-c-";
+
+const requiredPathNames = Object.freeze([
   "basePackage",
   "baseImplementation",
   "baseTest",
   "headPackage",
   "headImplementation",
   "headTest",
-];
+]);
 
-export function validateStateCInputs(paths) {
+function explicitEnvironment() {
+  const environment = {
+    LC_ALL: "C",
+    LANG: "C",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_OPTIONAL_LOCKS: "0",
+    GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
+    GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
+  };
+
+  if (
+    typeof process.env.PATH === "string" &&
+    process.env.PATH.length > 0
+  ) {
+    environment.PATH = process.env.PATH;
+  }
+
+  return environment;
+}
+
+function gitExecutable() {
+  const configured =
+    process.env.CHANGE_PROOF_GIT;
+
+  return (
+    typeof configured === "string" &&
+    configured.length > 0
+  )
+    ? configured
+    : "git";
+}
+
+function processConfiguration() {
+  return {
+    gitExecutable: gitExecutable(),
+    environment: explicitEnvironment(),
+    timeoutMs: COMMAND_TIMEOUT_MS,
+    maxStdoutBytes: OUTPUT_LIMIT_BYTES,
+    maxStderrBytes: OUTPUT_LIMIT_BYTES,
+  };
+}
+
+function validateStateCInputs(paths) {
   const errors = [];
 
   for (const name of requiredPathNames) {
     const path = paths?.[name];
 
-    if (typeof path !== "string" || path.length === 0) {
+    if (
+      typeof path !== "string" ||
+      path.length === 0
+    ) {
       errors.push(`missing_path_value:${name}`);
-      continue;
-    }
-
-    if (!existsSync(path)) {
+    } else if (!existsSync(path)) {
       errors.push(`fixture_path_not_found:${name}`);
     }
   }
@@ -42,69 +111,72 @@ export function validateStateCInputs(paths) {
   };
 }
 
-const workspacePrefix = join(tmpdir(), "change-proof-m1-state-c-");
-const markerName = ".change-proof-owned";
-const markerValue = "change-proof-m1-state-c-owned\n";
-
-export function withOwnedStateCWorkspace(callback) {
-  const workspace = mkdtempSync(workspacePrefix);
-  const markerPath = join(workspace, markerName);
-
-  writeFileSync(markerPath, markerValue, { flag: "wx" });
-
-  try {
-    if (!workspace.startsWith(workspacePrefix)) {
-      throw new Error("workspace_prefix_invalid");
-    }
-
-    return callback(workspace);
-  } finally {
-    const markerValid =
-      existsSync(markerPath) &&
-      readFileSync(markerPath, "utf8") === markerValue;
-
-    if (!workspace.startsWith(workspacePrefix) || !markerValid) {
-      throw new Error(`workspace_cleanup_refused:${workspace}`);
-    }
-
-    rmSync(workspace, { recursive: true });
-
-    if (existsSync(workspace)) {
-      throw new Error(`workspace_cleanup_failed:${workspace}`);
-    }
-  }
+function processFailure(result) {
+  return (
+    result.timedOut ||
+    result.processErrorCode !== null ||
+    result.signal !== null ||
+    result.stdoutTruncated ||
+    result.stderrTruncated ||
+    result.exitCode !== 0
+  );
 }
 
-const fixedGitEnvironment = {
-  ...process.env,
-  GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
-  GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
-};
-
-function runGit(args, cwd) {
-  const result = spawnSync("git", args, {
-    cwd,
-    encoding: "utf8",
-    env: fixedGitEnvironment,
+async function runFixtureGit(
+  argumentsList,
+  workingDirectory,
+) {
+  const configuration =
+    processConfiguration();
+  const result = await runBoundedCommand({
+    executable: configuration.gitExecutable,
+    arguments: [
+      "--no-pager",
+      "--literal-pathspecs",
+      ...argumentsList,
+    ],
+    workingDirectory,
+    environment: {
+      ...configuration.environment,
+    },
+    timeoutMs: configuration.timeoutMs,
+    maxStdoutBytes:
+      configuration.maxStdoutBytes,
+    maxStderrBytes:
+      configuration.maxStderrBytes,
   });
 
-  if (result.error) {
-    throw result.error;
-  }
-
-  if (result.status !== 0) {
+  if (processFailure(result)) {
     throw new Error(
-      `git ${args.join(" ")} failed: ${result.stderr.trim()}`,
+      `fixture_git_failed:${argumentsList[0]}`,
     );
   }
 
-  return result.stdout.trim();
+  return result;
 }
 
-export function createDeterministicFixtureRepository(
+function normalizeExpectedChangedPaths(value) {
+  const expectedPathsValid =
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((path) =>
+      typeof path === "string" &&
+      path.length > 0) &&
+    new Set(value).size === value.length;
+
+  if (!expectedPathsValid) {
+    throw new Error(
+      "invalid_expected_changed_paths",
+    );
+  }
+
+  return [...value].sort();
+}
+
+async function createDeterministicFixtureRepository(
   paths,
   workspace,
-  options = {},
+  expectedChangedPaths,
 ) {
   const validation = validateStateCInputs(paths);
 
@@ -113,89 +185,77 @@ export function createDeterministicFixtureRepository(
   }
 
   const repository = join(workspace, "repository");
+  await mkdir(join(repository, "src"), {
+    recursive: true,
+  });
+  await mkdir(join(repository, "test"), {
+    recursive: true,
+  });
 
-  mkdirSync(join(repository, "src"), { recursive: true });
-  mkdirSync(join(repository, "test"), { recursive: true });
-
-  copyFileSync(paths.basePackage, join(repository, "package.json"));
-  copyFileSync(
+  await copyFile(
+    paths.basePackage,
+    join(repository, "package.json"),
+  );
+  await copyFile(
     paths.baseImplementation,
-    join(repository, "src", "qualifies-for-free-shipping.js"),
+    join(repository, SOURCE_PATH),
   );
-  copyFileSync(
+  await copyFile(
     paths.baseTest,
-    join(repository, "test", "qualifies-for-free-shipping.test.js"),
+    join(repository, SELECTED_TEST_PATH),
   );
 
-  runGit(["init", "-b", "main"], repository);
-  runGit(["config", "user.name", "Change Proof Fixture"], repository);
-  runGit(
-    ["config", "user.email", "fixture@change-proof.invalid"],
+  await runFixtureGit(
+    ["init", "-b", "main"],
     repository,
   );
-  runGit(["add", "package.json", "src", "test"], repository);
-  runGit(
-    ["commit", "-m", "fixture: establish defective baseline"],
+  await runFixtureGit(
+    ["config", "user.name", "Change Proof Fixture"],
+    repository,
+  );
+  await runFixtureGit(
+    [
+      "config",
+      "user.email",
+      "fixture@change-proof.invalid",
+    ],
+    repository,
+  );
+  await runFixtureGit(
+    ["add", "package.json", "src", "test"],
+    repository,
+  );
+  await runFixtureGit(
+    [
+      "commit",
+      "-m",
+      "fixture: establish defective baseline",
+    ],
     repository,
   );
 
-  const baseSha = runGit(["rev-parse", "HEAD"], repository);
-
-  copyFileSync(
-    paths.headImplementation,
-    join(repository, "src", "qualifies-for-free-shipping.js"),
-  );
-  copyFileSync(
-    paths.headTest,
-    join(repository, "test", "qualifies-for-free-shipping.test.js"),
-  );
-
-  const changedPaths = runGit(["diff", "--name-only"], repository)
-    .split("\n")
-    .filter(Boolean)
-    .sort();
-
-  const defaultExpectedChangedPaths = [
-    "src/qualifies-for-free-shipping.js",
-    "test/qualifies-for-free-shipping.test.js",
-  ];
-
-  const expectedChangedPaths =
-    options.expectedChangedPaths ??
-    defaultExpectedChangedPaths;
-
-  const expectedPathsValid =
-    Array.isArray(expectedChangedPaths) &&
-    expectedChangedPaths.length > 0 &&
-    expectedChangedPaths.every(
-      (path) =>
-        typeof path === "string" &&
-        path.length > 0,
-    ) &&
-    new Set(expectedChangedPaths).size ===
-      expectedChangedPaths.length;
-
-  if (!expectedPathsValid) {
-    throw new Error("invalid_expected_changed_paths");
-  }
-
-  const normalizedExpectedPaths =
-    [...expectedChangedPaths].sort();
-
-  if (
-    JSON.stringify(changedPaths) !==
-    JSON.stringify(normalizedExpectedPaths)
-  ) {
-    throw new Error(
-      `unexpected_head_paths:` +
-      `actual=${changedPaths.join(",")}:` +
-      `expected=${normalizedExpectedPaths.join(",")}`,
+  const configuration = processConfiguration();
+  const primitives =
+    createGitRepositoryPrimitives(configuration);
+  const baseSha =
+    await primitives.resolveCommit(
+      repository,
+      "HEAD",
     );
-  }
 
-  runGit(["diff", "--quiet", "--", "package.json"], repository);
-  runGit(["add", "src", "test"], repository);
-  runGit(
+  await copyFile(
+    paths.headImplementation,
+    join(repository, SOURCE_PATH),
+  );
+  await copyFile(
+    paths.headTest,
+    join(repository, SELECTED_TEST_PATH),
+  );
+  await runFixtureGit(
+    ["add", "src", "test"],
+    repository,
+  );
+  await runFixtureGit(
     [
       "commit",
       "-m",
@@ -204,21 +264,63 @@ export function createDeterministicFixtureRepository(
     repository,
   );
 
-  const headSha = runGit(["rev-parse", "HEAD"], repository);
-  const headParent = runGit(["rev-parse", "HEAD^"], repository);
-  const status = runGit(["status", "--porcelain"], repository);
-  const remotes = runGit(["remote"], repository);
+  const headSha =
+    await primitives.resolveCommit(
+      repository,
+      "HEAD",
+    );
+  const headParent =
+    await primitives.resolveCommit(
+      repository,
+      `${headSha}^`,
+    );
+  const changedPaths =
+    await primitives.listChangedPaths(
+      repository,
+      baseSha,
+      headSha,
+    );
+  const normalizedExpectedPaths =
+    normalizeExpectedChangedPaths(
+      expectedChangedPaths,
+    );
+
+  if (
+    JSON.stringify(changedPaths) !==
+    JSON.stringify(normalizedExpectedPaths)
+  ) {
+    throw new Error(
+      "unexpected_head_paths:" +
+      `actual=${changedPaths.join(",")}:` +
+      `expected=${normalizedExpectedPaths.join(",")}`,
+    );
+  }
 
   if (headParent !== baseSha) {
-    throw new Error("head_parent_does_not_match_base");
+    throw new Error(
+      "head_parent_does_not_match_base",
+    );
   }
 
-  if (status !== "") {
-    throw new Error(`generated_repository_not_clean:${status}`);
+  if (
+    !await primitives.isWorktreeClean(
+      repository,
+    )
+  ) {
+    throw new Error(
+      "generated_repository_not_clean",
+    );
   }
 
-  if (remotes !== "") {
-    throw new Error(`generated_repository_has_remotes:${remotes}`);
+  const remotes = await runFixtureGit(
+    ["remote"],
+    repository,
+  );
+
+  if (remotes.stdout !== "") {
+    throw new Error(
+      "generated_repository_has_remotes",
+    );
   }
 
   return {
@@ -226,509 +328,98 @@ export function createDeterministicFixtureRepository(
     baseSha,
     headSha,
     changedPaths,
-    expectedChangedPaths: normalizedExpectedPaths,
+    expectedChangedPaths:
+      normalizedExpectedPaths,
   };
 }
 
-export function createStateCHybrid(generated, workspace) {
-  const testPath =
-    "test/qualifies-for-free-shipping.test.js";
-  const implementationPath =
-    "src/qualifies-for-free-shipping.js";
-  const stateC = join(workspace, "state-c");
-
-  runGit(
-    [
-      "worktree",
-      "add",
-      "--detach",
-      stateC,
-      generated.baseSha,
-    ],
-    generated.repository,
-  );
-
-  runGit(
-    [
-      "restore",
-      "--source",
-      generated.headSha,
-      "--worktree",
-      "--",
-      testPath,
-    ],
-    stateC,
-  );
-
-  const stateCSha = runGit(["rev-parse", "HEAD"], stateC);
-
-  const changedPaths = runGit(["diff", "--name-only"], stateC)
-    .split("\n")
-    .filter(Boolean)
-    .sort();
-
-  if (
-    stateCSha !== generated.baseSha ||
-    changedPaths.length !== 1 ||
-    changedPaths[0] !== testPath
-  ) {
-    throw new Error(
-      `state_c_boundary_invalid:${stateCSha}:${changedPaths.join(",")}`,
-    );
-  }
-
-  runGit(
-    ["diff", "--quiet", "--", implementationPath],
-    stateC,
-  );
-  runGit(["diff", "--quiet", "--", "package.json"], stateC);
-
-  const baseImplementationBlob = runGit(
-    [
-      "rev-parse",
-      `${generated.baseSha}:${implementationPath}`,
-    ],
-    generated.repository,
-  );
-
-  const stateCImplementationBlob = runGit(
-    ["hash-object", implementationPath],
-    stateC,
-  );
-
-  const headTestBlob = runGit(
-    ["rev-parse", `${generated.headSha}:${testPath}`],
-    generated.repository,
-  );
-
-  const stateCTestBlob = runGit(
-    ["hash-object", testPath],
-    stateC,
-  );
-
-  if (baseImplementationBlob !== stateCImplementationBlob) {
-    throw new Error("state_c_implementation_not_from_base");
-  }
-
-  if (headTestBlob !== stateCTestBlob) {
-    throw new Error("state_c_test_not_from_head");
-  }
-
-  return {
-    stateC,
-    stateCSha,
-    testPath,
-    implementationPath,
-    changedPaths,
-    baseImplementationBlob,
-    stateCImplementationBlob,
-    headTestBlob,
-    stateCTestBlob,
-  };
-}
-
-export function createPassingStates(
-  generated,
-  workspace,
-) {
-  const stateA = join(workspace, "state-a");
-  const stateB = generated.repository;
-
-  runGit(
-    [
-      "worktree",
-      "add",
-      "--detach",
-      stateA,
-      generated.baseSha,
-    ],
-    generated.repository,
-  );
-
-  const stateASha =
-    runGit(["rev-parse", "HEAD"], stateA);
-
-  const stateBSha =
-    runGit(["rev-parse", "HEAD"], stateB);
-
-  const stateAStatus =
-    runGit(["status", "--porcelain"], stateA);
-
-  const stateBStatus =
-    runGit(["status", "--porcelain"], stateB);
-
-  if (stateASha !== generated.baseSha) {
-    throw new Error(
-      `state_a_sha_mismatch:${stateASha}`,
-    );
-  }
-
-  if (stateBSha !== generated.headSha) {
-    throw new Error(
-      `state_b_sha_mismatch:${stateBSha}`,
-    );
-  }
-
-  if (stateAStatus !== "") {
-    throw new Error(
-      `state_a_not_clean:${stateAStatus}`,
-    );
-  }
-
-  if (stateBStatus !== "") {
-    throw new Error(
-      `state_b_not_clean:${stateBStatus}`,
-    );
-  }
-
-  return {
-    stateA,
-    stateB,
-    stateASha,
-    stateBSha,
-    stateAStatus,
-    stateBStatus,
-  };
-}
-
-export function executePassingState(
+async function executeNodeTest(
   directory,
   expectedTestCount,
+  expectedFailure = null,
 ) {
-  if (
-    !Number.isInteger(expectedTestCount) ||
-    expectedTestCount < 1
-  ) {
-    throw new Error(
-      `invalid_expected_test_count:${expectedTestCount}`,
-    );
-  }
+  const executionResult =
+    await runBoundedCommand({
+      executable: process.execPath,
+      arguments: [
+        "--test",
+        "--test-reporter=tap",
+      ],
+      workingDirectory: directory,
+      environment: explicitEnvironment(),
+      timeoutMs: COMMAND_TIMEOUT_MS,
+      maxStdoutBytes: OUTPUT_LIMIT_BYTES,
+      maxStderrBytes: OUTPUT_LIMIT_BYTES,
+    });
 
-  const startedAt = Date.now();
+  return expectedFailure === null
+    ? classifyNodeTestExecution({
+        executionResult,
+        expectedTestCount,
+      })
+    : classifyExpectedNodeTestRegression({
+        executionResult,
+        expectedTestCount,
+        expectedFailure,
+      });
+}
 
-  const execution = spawnSync(
-    process.execPath,
-    ["--test", "--test-reporter=tap"],
-    {
-      cwd: directory,
-      encoding: "utf8",
-      timeout: 10_000,
-      maxBuffer: 1024 * 1024,
-      env: {
-        ...process.env,
-      },
-    },
+function notRunState(reason) {
+  return {
+    outcome: "NOT_RUN",
+    invalidFailure: false,
+    reason,
+  };
+}
+
+function emptyBoundary() {
+  return {
+    stateCBasedOnBase: false,
+    implementationMatchesBase: false,
+    testMatchesHead: false,
+    changedPaths: [],
+  };
+}
+
+function legacyBoundary(boundary) {
+  return {
+    stateCBasedOnBase:
+      boundary.basedOnBase,
+    implementationMatchesBase:
+      boundary.unchangedPathsMatchBase,
+    testMatchesHead:
+      boundary.selectedPathsMatchHead,
+    changedPaths: [
+      ...boundary.resultingChangedPaths,
+    ],
+  };
+}
+
+function wasRemoved(
+  createdPath,
+  cleanup,
+) {
+  return (
+    createdPath === null ||
+    (
+      cleanup.worktreesRemoved
+        .includes(createdPath) &&
+      !cleanup.resourcesNotRemoved
+        .includes(createdPath)
+    )
   );
-
-  const durationMs = Date.now() - startedAt;
-  const stdout = execution.stdout ?? "";
-  const stderr = execution.stderr ?? "";
-  const output = `${stdout}${stderr}`;
-
-  const tapVersionPresent =
-    /^TAP version 13$/m.test(output);
-
-  const testCountMatches =
-    new RegExp(
-      `^# tests ${expectedTestCount}$`,
-      "m",
-    ).test(output);
-
-  const passCountMatches =
-    new RegExp(
-      `^# pass ${expectedTestCount}$`,
-      "m",
-    ).test(output);
-
-  const failCountMatches =
-    /^# fail 0$/m.test(output);
-
-  const cancelledCountMatches =
-    /^# cancelled 0$/m.test(output);
-
-  const skippedCountMatches =
-    /^# skipped 0$/m.test(output);
-
-  const todoCountMatches =
-    /^# todo 0$/m.test(output);
-
-  const failedSubtestPresent =
-    /^not ok [0-9]+ - /m.test(output);
-
-  const invalidFailurePattern =
-    /SyntaxError|ERR_MODULE_NOT_FOUND|Cannot find module|ERR_UNKNOWN_FILE_EXTENSION|timed out|timeout exceeded/i;
-
-  const processErrorCode =
-    execution.error?.code ?? null;
-
-  const timedOut =
-    processErrorCode === "ETIMEDOUT";
-
-  const invalidFailure =
-    processErrorCode !== null ||
-    execution.signal !== null ||
-    invalidFailurePattern.test(output);
-
-  const outcome =
-    execution.status === 0 &&
-    execution.signal === null &&
-    tapVersionPresent &&
-    testCountMatches &&
-    passCountMatches &&
-    failCountMatches &&
-    cancelledCountMatches &&
-    skippedCountMatches &&
-    todoCountMatches &&
-    !failedSubtestPresent &&
-    !invalidFailure
-      ? "PASS"
-      : "INCONCLUSIVE";
-
-  return {
-    command: `${process.execPath} --test --test-reporter=tap`,
-    expectedTestCount,
-    exitCode: execution.status,
-    signal: execution.signal,
-    durationMs,
-    processErrorCode,
-    timedOut,
-    tapVersionPresent,
-    testCountMatches,
-    passCountMatches,
-    failCountMatches,
-    cancelledCountMatches,
-    skippedCountMatches,
-    todoCountMatches,
-    failedSubtestPresent,
-    invalidFailure,
-    outcome,
-    output,
-  };
 }
 
-export function executeStateC(stateC) {
-  const startedAt = Date.now();
+async function runStateCExperiment(input) {
+  const {
+    scenarioName,
+    paths,
+    expectedChangedPaths,
+    stateATestCount,
+    stateBTestCount,
+    stateCExpectedFailure,
+  } = input;
 
-  const execution = spawnSync(
-    process.execPath,
-    ["--test", "--test-reporter=tap"],
-    {
-      cwd: stateC,
-      encoding: "utf8",
-      timeout: 10_000,
-      maxBuffer: 1024 * 1024,
-      env: {
-        ...process.env,
-      },
-    },
-  );
-
-  const durationMs = Date.now() - startedAt;
-  const stdout = execution.stdout ?? "";
-  const stderr = execution.stderr ?? "";
-  const output = `${stdout}${stderr}`;
-
-  const namedRegressionFailure =
-    /^not ok [0-9]+ - allows free shipping at the exact threshold$/m
-      .test(output);
-
-  const assertionFailure =
-    output.includes("code: 'ERR_ASSERTION'");
-
-  const observedValues =
-    output.includes("false !== true");
-
-  const passCountMatches =
-    /^# pass 2$/m.test(output);
-
-  const failCountMatches =
-    /^# fail 1$/m.test(output);
-
-  const passingTestCountMatches =
-    /^# tests 3$/m.test(output);
-
-  const passingPassCountMatches =
-    /^# pass 3$/m.test(output);
-
-  const passingFailCountMatches =
-    /^# fail 0$/m.test(output);
-
-  const cancelledCountMatches =
-    /^# cancelled 0$/m.test(output);
-
-  const skippedCountMatches =
-    /^# skipped 0$/m.test(output);
-
-  const todoCountMatches =
-    /^# todo 0$/m.test(output);
-
-  const failedSubtestPresent =
-    /^not ok [0-9]+ - /m.test(output);
-
-  const tapVersionPresent =
-    /^TAP version 13$/m.test(output);
-
-  const invalidFailurePattern =
-    /SyntaxError|ERR_MODULE_NOT_FOUND|Cannot find module|ERR_UNKNOWN_FILE_EXTENSION|timed out|timeout exceeded/i;
-
-  const processErrorCode =
-    execution.error?.code ?? null;
-
-  const timedOut =
-    processErrorCode === "ETIMEDOUT";
-
-  const invalidFailure =
-    processErrorCode !== null ||
-    execution.signal !== null ||
-    invalidFailurePattern.test(output);
-
-  const assertionOutcome =
-    execution.status === 1 &&
-    execution.signal === null &&
-    namedRegressionFailure &&
-    assertionFailure &&
-    observedValues &&
-    passCountMatches &&
-    failCountMatches &&
-    !invalidFailure;
-
-  const passingOutcome =
-    execution.status === 0 &&
-    execution.signal === null &&
-    tapVersionPresent &&
-    passingTestCountMatches &&
-    passingPassCountMatches &&
-    passingFailCountMatches &&
-    cancelledCountMatches &&
-    skippedCountMatches &&
-    todoCountMatches &&
-    !failedSubtestPresent &&
-    !invalidFailure;
-
-  const outcome =
-    assertionOutcome
-      ? "TEST_ASSERTION_FAILURE"
-      : passingOutcome
-        ? "PASS"
-        : "INCONCLUSIVE";
-
-  return {
-    command: `${process.execPath} --test --test-reporter=tap`,
-    exitCode: execution.status,
-    signal: execution.signal,
-    durationMs,
-    processErrorCode,
-    timedOut,
-    namedRegressionFailure,
-    assertionFailure,
-    observedValues,
-    passCountMatches,
-    failCountMatches,
-    tapVersionPresent,
-    passingTestCountMatches,
-    passingPassCountMatches,
-    passingFailCountMatches,
-    cancelledCountMatches,
-    skippedCountMatches,
-    todoCountMatches,
-    failedSubtestPresent,
-    invalidFailure,
-    outcome,
-    output,
-  };
-}
-
-export function evaluateThreeStateEvidence({
-  stateA,
-  stateB,
-  stateC,
-  boundary,
-}) {
-  const requiredInputs = {
-    stateA,
-    stateB,
-    stateC,
-    boundary,
-  };
-
-  for (const [name, value] of Object.entries(requiredInputs)) {
-    if (!value || typeof value !== "object") {
-      throw new Error(`missing_evidence_input:${name}`);
-    }
-  }
-
-  const operationalFailure =
-    stateA.invalidFailure === true ||
-    stateB.invalidFailure === true ||
-    stateC.invalidFailure === true;
-
-  if (operationalFailure) {
-    return {
-      verdict: "OPERATIONAL_ERROR",
-      reason: "A state encountered an execution or environment failure.",
-    };
-  }
-
-  if (stateA.outcome !== "PASS") {
-    return {
-      verdict: "BASE_FAILED",
-      reason: "The exact base state did not pass its baseline tests.",
-    };
-  }
-
-  if (stateB.outcome !== "PASS") {
-    return {
-      verdict: "HEAD_FAILED",
-      reason: "The exact head state did not pass its complete tests.",
-    };
-  }
-
-  const boundaryValid =
-    boundary.stateCBasedOnBase === true &&
-    boundary.implementationMatchesBase === true &&
-    boundary.testMatchesHead === true &&
-    Array.isArray(boundary.changedPaths) &&
-    boundary.changedPaths.length === 1 &&
-    boundary.changedPaths[0] ===
-      "test/qualifies-for-free-shipping.test.js";
-
-  if (!boundaryValid) {
-    return {
-      verdict: "INVALID_TEST_ENVELOPE",
-      reason: "The State C commit or transferred test boundary is invalid.",
-    };
-  }
-
-  if (stateC.outcome === "TEST_ASSERTION_FAILURE") {
-    return {
-      verdict: "OBSERVED_TEST_DISCRIMINATION",
-      reason:
-        "The selected head test failed at the expected assertion against the exact base implementation.",
-    };
-  }
-
-  if (stateC.outcome === "PASS") {
-    return {
-      verdict: "NON_DISCRIMINATING_TESTS",
-      reason:
-        "The selected head test also passed against the exact base implementation.",
-    };
-  }
-
-  return {
-    verdict: "INCONCLUSIVE",
-    reason:
-      "The evidence did not satisfy a supported discrimination or non-discrimination outcome.",
-  };
-}
-
-export function runStateCExperiment({
-  scenarioName,
-  paths,
-  expectedChangedPaths,
-  stateATestCount,
-  stateBTestCount,
-}) {
   if (
     typeof scenarioName !== "string" ||
     scenarioName.length === 0
@@ -746,242 +437,407 @@ export function runStateCExperiment({
     stateATestCount,
     stateBTestCount,
   })) {
-    if (!Number.isInteger(value) || value < 1) {
+    if (
+      !Number.isInteger(value) ||
+      value < 1
+    ) {
       throw new Error(
         `invalid_experiment_test_count:${name}:${value}`,
       );
     }
   }
 
-  let workspacePath;
-  let stateAPath;
-  let stateBPath;
-  let stateCPath;
-  let stateCCreated = false;
-
-  const notRunState = (reason) => ({
-    outcome: "NOT_RUN",
-    invalidFailure: false,
-    reason,
-  });
-
-  const emptyBoundary = {
-    stateCBasedOnBase: false,
-    implementationMatchesBase: false,
-    testMatchesHead: false,
-    changedPaths: [],
-  };
-
-  const evidence = withOwnedStateCWorkspace(
-    (workspace) => {
-      workspacePath = workspace;
-
-      const generated =
-        createDeterministicFixtureRepository(
-          paths,
-          workspace,
-          expectedChangedPaths
-            ? { expectedChangedPaths }
-            : {},
-        );
-
-      const passingStates =
-        createPassingStates(generated, workspace);
-
-      stateAPath = passingStates.stateA;
-      stateBPath = passingStates.stateB;
-
-      const stateA =
-        executePassingState(
-          passingStates.stateA,
-          stateATestCount,
-        );
-
-      if (
-        stateA.outcome !== "PASS" ||
-        stateA.invalidFailure === true
-      ) {
-        const stateB =
-          notRunState("STATE_A_DID_NOT_PASS");
-
-        const stateC =
-          notRunState("STATE_A_DID_NOT_PASS");
-
-        const aggregate =
-          evaluateThreeStateEvidence({
-            stateA,
-            stateB,
-            stateC,
-            boundary: emptyBoundary,
-          });
-
-        return {
-          repository: {
-            baseSha: generated.baseSha,
-            headSha: generated.headSha,
-            changedPaths: generated.changedPaths,
-            expectedChangedPaths:
-              generated.expectedChangedPaths,
-          },
-          states: {
-            stateA: {
-              sha: passingStates.stateASha,
-              execution: stateA,
-            },
-            stateB: {
-              sha: passingStates.stateBSha,
-              execution: stateB,
-            },
-            stateC: {
-              sha: null,
-              execution: stateC,
-            },
-          },
-          boundary: emptyBoundary,
-          verdict: aggregate.verdict,
-          reason: aggregate.reason,
-        };
-      }
-
-      const stateB =
-        executePassingState(
-          passingStates.stateB,
-          stateBTestCount,
-        );
-
-      if (
-        stateB.outcome !== "PASS" ||
-        stateB.invalidFailure === true
-      ) {
-        const stateC =
-          notRunState("STATE_B_DID_NOT_PASS");
-
-        const aggregate =
-          evaluateThreeStateEvidence({
-            stateA,
-            stateB,
-            stateC,
-            boundary: emptyBoundary,
-          });
-
-        return {
-          repository: {
-            baseSha: generated.baseSha,
-            headSha: generated.headSha,
-            changedPaths: generated.changedPaths,
-            expectedChangedPaths:
-              generated.expectedChangedPaths,
-          },
-          states: {
-            stateA: {
-              sha: passingStates.stateASha,
-              execution: stateA,
-            },
-            stateB: {
-              sha: passingStates.stateBSha,
-              execution: stateB,
-            },
-            stateC: {
-              sha: null,
-              execution: stateC,
-            },
-          },
-          boundary: emptyBoundary,
-          verdict: aggregate.verdict,
-          reason: aggregate.reason,
-        };
-      }
-
-      const hybrid =
-        createStateCHybrid(generated, workspace);
-
-      stateCPath = hybrid.stateC;
-      stateCCreated = true;
-
-      const stateC =
-        executeStateC(hybrid.stateC);
-
-      const boundary = {
-        stateCBasedOnBase:
-          hybrid.stateCSha === generated.baseSha,
-        implementationMatchesBase:
-          hybrid.baseImplementationBlob ===
-          hybrid.stateCImplementationBlob,
-        testMatchesHead:
-          hybrid.headTestBlob ===
-          hybrid.stateCTestBlob,
-        changedPaths: hybrid.changedPaths,
-      };
-
-      const aggregate =
-        evaluateThreeStateEvidence({
-          stateA,
-          stateB,
-          stateC,
-          boundary,
-        });
-
-      return {
-        repository: {
-          baseSha: generated.baseSha,
-          headSha: generated.headSha,
-          changedPaths: generated.changedPaths,
-          expectedChangedPaths:
-            generated.expectedChangedPaths,
-        },
-        states: {
-          stateA: {
-            sha: passingStates.stateASha,
-            execution: stateA,
-          },
-          stateB: {
-            sha: passingStates.stateBSha,
-            execution: stateB,
-          },
-          stateC: {
-            sha: hybrid.stateCSha,
-            execution: stateC,
-          },
-        },
-        boundary,
-        verdict: aggregate.verdict,
-        reason: aggregate.reason,
-      };
-    },
+  const fixtureWorkspace = await mkdtemp(
+    join(tmpdir(), WORKSPACE_PREFIX),
   );
+  let completed;
 
-  const cleanup = {
-    workspaceRemoved:
-      Boolean(workspacePath) &&
-      !existsSync(workspacePath),
+  try {
+    const generated =
+      await createDeterministicFixtureRepository(
+        paths,
+        fixtureWorkspace,
+        expectedChangedPaths,
+      );
+    const configuration = processConfiguration();
+    const lifecycle =
+      createOwnedWorkspaceLifecycle({
+        ...configuration,
+        temporaryParentDirectory:
+          fixtureWorkspace,
+        workspacePrefix: "owned-states-",
+        repositoryRoot: generated.repository,
+      });
+    const materializer =
+      createExplicitEnvelopeMaterializer(
+        configuration,
+      );
+    let stateAPath = null;
+    let stateBPath = null;
+    let stateCPath = null;
 
-    stateARemoved:
-      Boolean(stateAPath) &&
-      !existsSync(stateAPath),
+    const lifecycleResult =
+      await lifecycle.withOwnedWorkspace(
+        async (invocation) => {
+          const stateAWorktree =
+            await invocation
+              .createDetachedWorktree({
+                name: "state-a",
+                commitId: generated.baseSha,
+              });
+          stateAPath = stateAWorktree.path;
+          const stateA = await executeNodeTest(
+            stateAPath,
+            stateATestCount,
+          );
 
-    stateBRemoved:
-      Boolean(stateBPath) &&
-      !existsSync(stateBPath),
+          if (
+            stateA.outcome !== "PASS" ||
+            stateA.invalidFailure === true
+          ) {
+            const stateB = notRunState(
+              "STATE_A_DID_NOT_PASS",
+            );
+            const stateC = notRunState(
+              "STATE_A_DID_NOT_PASS",
+            );
+            const aggregate = evaluateEvidence({
+              stateA,
+              stateB,
+              stateC,
+              boundary: { valid: false },
+            });
 
-    stateCCreated,
+            return {
+              generated,
+              stateA,
+              stateB,
+              stateC,
+              stateCSha: null,
+              boundary: emptyBoundary(),
+              boundaryValid: false,
+              aggregate,
+              stateCCreated: false,
+            };
+          }
 
-    stateCRemoved:
-      stateCCreated
-        ? Boolean(stateCPath) &&
-          !existsSync(stateCPath)
-        : true,
-  };
+          const stateBWorktree =
+            await invocation
+              .createDetachedWorktree({
+                name: "state-b",
+                commitId: generated.headSha,
+              });
+          stateBPath = stateBWorktree.path;
+          const stateB = await executeNodeTest(
+            stateBPath,
+            stateBTestCount,
+          );
+
+          if (
+            stateB.outcome !== "PASS" ||
+            stateB.invalidFailure === true
+          ) {
+            const stateC = notRunState(
+              "STATE_B_DID_NOT_PASS",
+            );
+            const aggregate = evaluateEvidence({
+              stateA,
+              stateB,
+              stateC,
+              boundary: { valid: false },
+            });
+
+            return {
+              generated,
+              stateA,
+              stateB,
+              stateC,
+              stateCSha: null,
+              boundary: emptyBoundary(),
+              boundaryValid: false,
+              aggregate,
+              stateCCreated: false,
+            };
+          }
+
+          const materialized =
+            await materializer
+              .materializeExplicitEnvelope(
+                invocation,
+                {
+                  repositoryRoot:
+                    generated.repository,
+                  baseCommitId:
+                    generated.baseSha,
+                  headCommitId:
+                    generated.headSha,
+                  includedPaths: [
+                    SELECTED_TEST_PATH,
+                  ],
+                },
+              );
+          stateCPath =
+            materialized.stateCWorktreePath;
+          const stateC = await executeNodeTest(
+            stateCPath,
+            stateBTestCount,
+            stateCExpectedFailure,
+          );
+          const aggregate = evaluateEvidence({
+            stateA,
+            stateB,
+            stateC,
+            boundary: {
+              valid:
+                materialized.boundary
+                  .boundaryValid,
+            },
+          });
+
+          return {
+            generated,
+            stateA,
+            stateB,
+            stateC,
+            stateCSha:
+              materialized.evidence
+                .stateCBaseCommitId,
+            boundary: legacyBoundary(
+              materialized.boundary,
+            ),
+            boundaryValid:
+              materialized.boundary
+                .boundaryValid,
+            aggregate,
+            stateCCreated: true,
+          };
+        },
+      );
+
+    const evidence = lifecycleResult.value;
+    const cleanupEvidence =
+      lifecycleResult.cleanup;
+    const cleanup = {
+      workspaceRemoved:
+        cleanupEvidence.workspaceRemoved,
+      stateARemoved:
+        wasRemoved(
+          stateAPath,
+          cleanupEvidence,
+        ),
+      stateBRemoved:
+        wasRemoved(
+          stateBPath,
+          cleanupEvidence,
+        ),
+      stateCCreated:
+        evidence.stateCCreated,
+      stateCRemoved:
+        wasRemoved(
+          stateCPath,
+          cleanupEvidence,
+        ),
+    };
+
+    completed = {
+      schemaVersion: "0.1",
+      experiment: "m1-controlled-fixture",
+      scenario: scenarioName,
+      repository: {
+        baseSha: evidence.generated.baseSha,
+        headSha: evidence.generated.headSha,
+        changedPaths:
+          evidence.generated.changedPaths,
+        expectedChangedPaths:
+          evidence.generated.expectedChangedPaths,
+      },
+      states: {
+        stateA: {
+          sha: evidence.generated.baseSha,
+          execution: evidence.stateA,
+        },
+        stateB: {
+          sha: evidence.generated.headSha,
+          execution: evidence.stateB,
+        },
+        stateC: {
+          sha: evidence.stateCSha,
+          execution: evidence.stateC,
+        },
+      },
+      boundary: evidence.boundary,
+      productionBoundaryValid:
+        evidence.boundaryValid,
+      verdict: evidence.aggregate.verdict,
+      reason: evidence.aggregate.reason,
+      cleanup,
+    };
+  } finally {
+    await rm(fixtureWorkspace, {
+      recursive: true,
+      force: false,
+    });
+  }
+
+  if (existsSync(fixtureWorkspace)) {
+    throw new Error(
+      "fixture_workspace_cleanup_failed",
+    );
+  }
+
+  return completed;
+}
+
+function fixturePaths(
+  fixtureRoot,
+  baseName,
+  headName,
+) {
+  const baseRoot = join(fixtureRoot, baseName);
+  const headRoot = join(fixtureRoot, headName);
 
   return {
-    schemaVersion: "0.1",
-    experiment: "m1-controlled-fixture",
-    scenario: scenarioName,
-    ...evidence,
-    cleanup,
+    basePackage: join(baseRoot, "package.json"),
+    baseImplementation:
+      join(baseRoot, SOURCE_PATH),
+    baseTest:
+      join(baseRoot, SELECTED_TEST_PATH),
+    headPackage: join(headRoot, "package.json"),
+    headImplementation:
+      join(headRoot, SOURCE_PATH),
+    headTest:
+      join(headRoot, SELECTED_TEST_PATH),
   };
 }
 
-export function runControlledFixtureMatrix(
+function scenarioMatrix(fixtureRoot) {
+  return [
+    {
+      name: "positive",
+      input: {
+        scenarioName: "positive",
+        paths: fixturePaths(
+          fixtureRoot,
+          "base",
+          "head",
+        ),
+        expectedChangedPaths: [
+          SOURCE_PATH,
+          SELECTED_TEST_PATH,
+        ],
+        stateATestCount: 2,
+        stateBTestCount: 3,
+        stateCExpectedFailure: {
+          testName:
+            "allows free shipping at the exact threshold",
+          outputIncludes: [
+            "code: 'ERR_ASSERTION'",
+            "false !== true",
+          ],
+        },
+      },
+      expected: {
+        verdict:
+          "OBSERVED_TEST_DISCRIMINATION",
+        outcomes: [
+          "PASS",
+          "PASS",
+          "TEST_ASSERTION_FAILURE",
+        ],
+        stateCCreated: true,
+        boundaryValid: true,
+      },
+    },
+    {
+      name: "non_discriminating",
+      input: {
+        scenarioName: "non_discriminating",
+        paths: fixturePaths(
+          fixtureRoot,
+          "base",
+          "non-discriminating",
+        ),
+        expectedChangedPaths: [
+          SOURCE_PATH,
+          SELECTED_TEST_PATH,
+        ],
+        stateATestCount: 2,
+        stateBTestCount: 3,
+        stateCExpectedFailure: null,
+      },
+      expected: {
+        verdict:
+          "NON_DISCRIMINATING_TESTS",
+        outcomes: ["PASS", "PASS", "PASS"],
+        stateCCreated: true,
+        boundaryValid: true,
+      },
+    },
+    {
+      name: "head_failed",
+      input: {
+        scenarioName: "head_failed",
+        paths: fixturePaths(
+          fixtureRoot,
+          "base",
+          "head-failed",
+        ),
+        expectedChangedPaths: [
+          SELECTED_TEST_PATH,
+        ],
+        stateATestCount: 2,
+        stateBTestCount: 3,
+        stateCExpectedFailure: null,
+      },
+      expected: {
+        verdict: "HEAD_FAILED",
+        outcomes: [
+          "PASS",
+          "INCONCLUSIVE",
+          "NOT_RUN",
+        ],
+        stateCCreated: false,
+        boundaryValid: false,
+      },
+    },
+    {
+      name: "base_failed",
+      input: {
+        scenarioName: "base_failed",
+        paths: fixturePaths(
+          fixtureRoot,
+          "base-failed",
+          "head",
+        ),
+        expectedChangedPaths: [SOURCE_PATH],
+        stateATestCount: 3,
+        stateBTestCount: 3,
+        stateCExpectedFailure: null,
+      },
+      expected: {
+        verdict: "BASE_FAILED",
+        outcomes: [
+          "INCONCLUSIVE",
+          "NOT_RUN",
+          "NOT_RUN",
+        ],
+        stateCCreated: false,
+        boundaryValid: false,
+      },
+    },
+  ];
+}
+
+function cleanupIsValid(cleanup) {
+  return (
+    cleanup.workspaceRemoved === true &&
+    cleanup.stateARemoved === true &&
+    cleanup.stateBRemoved === true &&
+    cleanup.stateCRemoved === true
+  );
+}
+
+export async function runControlledFixtureMatrix(
   fixtureRoot,
 ) {
   if (
@@ -991,178 +847,11 @@ export function runControlledFixtureMatrix(
     throw new Error("invalid_fixture_root");
   }
 
-  const selectedTestPath =
-    "test/qualifies-for-free-shipping.test.js";
-
-  const sourcePath =
-    "src/qualifies-for-free-shipping.js";
-
-  const fixturePaths = (baseName, headName) => {
-    const baseRoot = join(fixtureRoot, baseName);
-    const headRoot = join(fixtureRoot, headName);
-
-    return {
-      basePackage:
-        join(baseRoot, "package.json"),
-
-      baseImplementation:
-        join(baseRoot, sourcePath),
-
-      baseTest:
-        join(baseRoot, selectedTestPath),
-
-      headPackage:
-        join(headRoot, "package.json"),
-
-      headImplementation:
-        join(headRoot, sourcePath),
-
-      headTest:
-        join(headRoot, selectedTestPath),
-    };
-  };
-
-  const scenarios = [
-    {
-      name: "positive",
-
-      input: {
-        scenarioName: "positive",
-
-        paths:
-          fixturePaths("base", "head"),
-
-        stateATestCount: 2,
-        stateBTestCount: 3,
-      },
-
-      expected: {
-        verdict:
-          "OBSERVED_TEST_DISCRIMINATION",
-
-        outcomes: [
-          "PASS",
-          "PASS",
-          "TEST_ASSERTION_FAILURE",
-        ],
-
-        stateCCreated: true,
-        boundaryValid: true,
-      },
-    },
-
-    {
-      name: "non_discriminating",
-
-      input: {
-        scenarioName:
-          "non_discriminating",
-
-        paths:
-          fixturePaths(
-            "base",
-            "non-discriminating",
-          ),
-
-        stateATestCount: 2,
-        stateBTestCount: 3,
-      },
-
-      expected: {
-        verdict:
-          "NON_DISCRIMINATING_TESTS",
-
-        outcomes: [
-          "PASS",
-          "PASS",
-          "PASS",
-        ],
-
-        stateCCreated: true,
-        boundaryValid: true,
-      },
-    },
-
-    {
-      name: "head_failed",
-
-      input: {
-        scenarioName:
-          "head_failed",
-
-        paths:
-          fixturePaths(
-            "base",
-            "head-failed",
-          ),
-
-        expectedChangedPaths: [
-          selectedTestPath,
-        ],
-
-        stateATestCount: 2,
-        stateBTestCount: 3,
-      },
-
-      expected: {
-        verdict:
-          "HEAD_FAILED",
-
-        outcomes: [
-          "PASS",
-          "INCONCLUSIVE",
-          "NOT_RUN",
-        ],
-
-        stateCCreated: false,
-        boundaryValid: false,
-      },
-    },
-
-    {
-      name: "base_failed",
-
-      input: {
-        scenarioName:
-          "base_failed",
-
-        paths:
-          fixturePaths(
-            "base-failed",
-            "head",
-          ),
-
-        expectedChangedPaths: [
-          sourcePath,
-        ],
-
-        stateATestCount: 3,
-        stateBTestCount: 3,
-      },
-
-      expected: {
-        verdict:
-          "BASE_FAILED",
-
-        outcomes: [
-          "INCONCLUSIVE",
-          "NOT_RUN",
-          "NOT_RUN",
-        ],
-
-        stateCCreated: false,
-        boundaryValid: false,
-      },
-    },
-  ];
-
+  const scenarios = scenarioMatrix(fixtureRoot);
   const fixtureFiles = new Set(
-    scenarios.flatMap(
-      ({ input }) =>
-        Object.values(input.paths),
-    ),
+    scenarios.flatMap(({ input }) =>
+      Object.values(input.paths)),
   );
-
   const missingFixtureFiles =
     [...fixtureFiles].filter(
       (path) => !existsSync(path),
@@ -1172,102 +861,61 @@ export function runControlledFixtureMatrix(
     return {
       exitCode: 2,
       preflightPassed: false,
-
       summary: [],
-
-      errors:
-        missingFixtureFiles.map(
-          (path) =>
-            `missing_fixture_file=${path}`,
-        ),
-
+      errors: missingFixtureFiles.map(
+        (path) => `missing_fixture_file=${path}`,
+      ),
       terminalMarker:
         "M1_RUNNER_PREFLIGHT_FAILED",
-
       manifest: {
         schemaVersion: "0.1",
-
-        experiment:
-          "m1-controlled-fixture",
-
-        selectedTestPath,
-
-        scenarioCount:
-          scenarios.length,
-
+        experiment: "m1-controlled-fixture",
+        selectedTestPath: SELECTED_TEST_PATH,
+        scenarioCount: scenarios.length,
         completedScenarioCount: 0,
-
-        status:
-          "PREFLIGHT_FAILED",
-
+        status: "PREFLIGHT_FAILED",
         scenarios: [],
       },
     };
   }
 
-  const boundaryIsValid = (boundary) => (
-    boundary.stateCBasedOnBase === true &&
-    boundary.implementationMatchesBase === true &&
-    boundary.testMatchesHead === true &&
-    Array.isArray(boundary.changedPaths) &&
-    boundary.changedPaths.length === 1 &&
-    boundary.changedPaths[0] ===
-      selectedTestPath
-  );
-
-  const cleanupIsValid = (cleanup) => (
-    cleanup.workspaceRemoved === true &&
-    cleanup.stateARemoved === true &&
-    cleanup.stateBRemoved === true &&
-    cleanup.stateCRemoved === true
-  );
-
   const results = [];
   const summary = [];
   const errors = [];
-
   let operationalError = false;
   let verificationFailed = false;
 
   for (const scenario of scenarios) {
     try {
       const actual =
-        runStateCExperiment(
+        await runStateCExperiment(
           scenario.input,
         );
-
       const outcomes = [
         actual.states.stateA.execution.outcome,
         actual.states.stateB.execution.outcome,
         actual.states.stateC.execution.outcome,
       ];
-
       const checks = {
         identity:
           actual.schemaVersion === "0.1" &&
           actual.experiment ===
             "m1-controlled-fixture" &&
-          actual.scenario ===
-            scenario.name,
-
+          actual.scenario === scenario.name,
         verdict:
           actual.verdict ===
             scenario.expected.verdict,
-
         outcomes:
           JSON.stringify(outcomes) ===
           JSON.stringify(
             scenario.expected.outcomes,
           ),
-
         stateCCreation:
           actual.cleanup.stateCCreated ===
           scenario.expected.stateCCreated,
-
         boundary:
-          boundaryIsValid(actual.boundary) ===
+          actual.productionBoundaryValid ===
           scenario.expected.boundaryValid,
-
         stateShas:
           actual.states.stateA.sha ===
             actual.repository.baseSha &&
@@ -1277,14 +925,10 @@ export function runControlledFixtureMatrix(
             scenario.expected.stateCCreated
               ? actual.states.stateC.sha ===
                 actual.repository.baseSha
-              : actual.states.stateC.sha ===
-                null
+              : actual.states.stateC.sha === null
           ),
-
-        cleanup:
-          cleanupIsValid(actual.cleanup),
+        cleanup: cleanupIsValid(actual.cleanup),
       };
-
       const passed =
         Object.values(checks).every(Boolean);
 
@@ -1298,125 +942,90 @@ export function runControlledFixtureMatrix(
         outcomes,
         passed,
       });
-
       results.push({
-        scenario:
-          scenario.name,
-
+        scenario: scenario.name,
         expectedVerdict:
           scenario.expected.verdict,
-
-        verdict:
-          actual.verdict,
-
-        reason:
-          actual.reason,
-
-        repository:
-          actual.repository,
-
+        verdict: actual.verdict,
+        reason: actual.reason,
+        repository: actual.repository,
         states: {
           stateA: {
-            sha:
-              actual.states.stateA.sha,
-
-            outcome:
-              outcomes[0],
+            sha: actual.states.stateA.sha,
+            outcome: outcomes[0],
           },
-
           stateB: {
-            sha:
-              actual.states.stateB.sha,
-
-            outcome:
-              outcomes[1],
+            sha: actual.states.stateB.sha,
+            outcome: outcomes[1],
           },
-
           stateC: {
-            sha:
-              actual.states.stateC.sha,
-
-            outcome:
-              outcomes[2],
+            sha: actual.states.stateC.sha,
+            outcome: outcomes[2],
           },
         },
-
-        boundary:
-          actual.boundary,
-
-        cleanup:
-          actual.cleanup,
-
+        boundary: actual.boundary,
+        cleanup: actual.cleanup,
         checks,
         passed,
       });
     } catch (error) {
       operationalError = true;
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : String(error);
+      const message = error instanceof Error
+        ? error.message
+        : String(error);
+      const aggregate = evaluateEvidence({
+        stateA: {
+          outcome: "NOT_AVAILABLE",
+          invalidFailure: true,
+        },
+        stateB: notRunState(
+          "SCENARIO_OPERATIONAL_ERROR",
+        ),
+        stateC: notRunState(
+          "SCENARIO_OPERATIONAL_ERROR",
+        ),
+        boundary: { valid: false },
+      });
 
       errors.push(
-        `scenario_error=${scenario.name}:` +
-        message,
+        `scenario_error=${scenario.name}:${message}`,
       );
-
       summary.push({
-        scenario:
-          scenario.name,
-
-        verdict:
-          "OPERATIONAL_ERROR",
-
+        scenario: scenario.name,
+        verdict: aggregate.verdict,
         outcomes: [
           "NOT_AVAILABLE",
           "NOT_AVAILABLE",
           "NOT_AVAILABLE",
         ],
-
         passed: false,
       });
-
       results.push({
-        scenario:
-          scenario.name,
-
+        scenario: scenario.name,
         expectedVerdict:
           scenario.expected.verdict,
-
-        verdict:
-          "OPERATIONAL_ERROR",
-
-        reason:
-          message,
-
+        verdict: aggregate.verdict,
+        reason: message,
         passed: false,
       });
     }
   }
 
-  const status =
-    operationalError
-      ? "OPERATIONAL_ERROR"
-      : verificationFailed
-        ? "VERIFICATION_FAILED"
-        : "VERIFIED";
-
-  const exitCode =
-    operationalError
-      ? 3
-      : verificationFailed
-        ? 1
-        : 0;
-
-  const terminalMarker =
-    operationalError
-      ? "M1_RUNNER_OPERATIONAL_ERROR"
-      : verificationFailed
-        ? "M1_RUNNER_VERIFICATION_FAILED"
-        : "M1_RUNNER_VERIFIED";
+  const status = operationalError
+    ? "OPERATIONAL_ERROR"
+    : verificationFailed
+      ? "VERIFICATION_FAILED"
+      : "VERIFIED";
+  const exitCode = operationalError
+    ? 3
+    : verificationFailed
+      ? 1
+      : 0;
+  const terminalMarker = operationalError
+    ? "M1_RUNNER_OPERATIONAL_ERROR"
+    : verificationFailed
+      ? "M1_RUNNER_VERIFICATION_FAILED"
+      : "M1_RUNNER_VERIFIED";
 
   return {
     exitCode,
@@ -1424,21 +1033,12 @@ export function runControlledFixtureMatrix(
     summary,
     errors,
     terminalMarker,
-
     manifest: {
       schemaVersion: "0.1",
-
-      experiment:
-        "m1-controlled-fixture",
-
-      selectedTestPath,
-
-      scenarioCount:
-        scenarios.length,
-
-      completedScenarioCount:
-        results.length,
-
+      experiment: "m1-controlled-fixture",
+      selectedTestPath: SELECTED_TEST_PATH,
+      scenarioCount: scenarios.length,
+      completedScenarioCount: results.length,
       status,
       scenarios: results,
     },
