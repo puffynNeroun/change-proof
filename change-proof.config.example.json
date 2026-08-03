@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "0.1",
+  "repositoryRoot": "./repository",
+  "baseRef": "BASE_COMMIT_OR_REF",
+  "headRef": "HEAD_COMMIT_OR_REF",
+  "command": {
+    "executable": "node",
+    "arguments": [
+      "--test",
+      "--test-reporter=tap",
+      "test/regression.test.mjs"
+    ],
+    "workingDirectory": ".",
+    "environment": {
+      "PATH": "/usr/local/bin:/usr/bin:/bin",
+      "LC_ALL": "C",
+      "LANG": "C"
+    },
+    "timeoutMs": 30000,
+    "maxStdoutBytes": 4194304,
+    "maxStderrBytes": 4194304
+  },
+  "envelope": {
+    "includedPaths": [
+      "test/regression.test.mjs"
+    ]
+  },
+  "classification": {
+    "stateA": {
+      "expectedTestCount": 10
+    },
+    "stateB": {
+      "expectedTestCount": 11
+    },
+    "stateC": {
+      "expectedTestCount": 11,
+      "expectedFailures": [
+        {
+          "testName": "changed behavior is covered",
+          "outputIncludes": [
+            "code: 'ERR_ASSERTION'",
+            "expected value"
+          ]
+        }
+      ]
+    }
+  },
+  "temporaryParentDirectory": "../change-proof-temp",
+  "workspacePrefix": "change-proof-",
+  "outputDirectory": "../change-proof-output"
+}
