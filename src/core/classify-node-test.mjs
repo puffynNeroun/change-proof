@@ -5,6 +5,9 @@ export const NODE_TEST_OUTCOMES =
     TEST_ASSERTION_FAILURE:
       "TEST_ASSERTION_FAILURE",
 
+    EXPECTED_TEST_FAILURE:
+      "EXPECTED_TEST_FAILURE",
+
     TEST_DISCOVERY_FAILURE:
       "TEST_DISCOVERY_FAILURE",
 
@@ -31,6 +34,9 @@ export const NODE_TEST_REASON_CODES =
 
     EXPECTED_ASSERTION_FAILURE_OBSERVED:
       "EXPECTED_ASSERTION_FAILURE_OBSERVED",
+
+    EXPECTED_TEST_FAILURE_SET_OBSERVED:
+      "EXPECTED_TEST_FAILURE_SET_OBSERVED",
 
     EXPECTED_ASSERTION_FAILURE_NOT_OBSERVED:
       "EXPECTED_ASSERTION_FAILURE_NOT_OBSERVED",
@@ -256,25 +262,105 @@ function summaryComplete(summary) {
   );
 }
 
-function parseFailedSubtests(output) {
-  const pattern =
-    /^not ok [0-9]+ - (.+)$/gm;
+function parseTopLevelTestResults(output) {
+  const lines = output.split(/\r?\n/);
+  const results = [];
+  let pendingSubtest = null;
 
-  const failedSubtests = [];
-  let match;
-
-  while (
-    (
-      match =
-        pattern.exec(output)
-    ) !== null
+  for (
+    let lineIndex = 0;
+    lineIndex < lines.length;
+    lineIndex += 1
   ) {
-    failedSubtests.push(
-      match[1].trim(),
-    );
+    const line = lines[lineIndex];
+    const subtestMatch =
+      /^# Subtest: (.+)$/
+        .exec(line);
+
+    if (subtestMatch !== null) {
+      pendingSubtest = {
+        testName:
+          subtestMatch[1].trim(),
+        lineIndex,
+      };
+
+      continue;
+    }
+
+    const resultMatch =
+      /^(not )?ok ([0-9]+) - (.+)$/
+        .exec(line);
+
+    if (resultMatch === null) {
+      continue;
+    }
+
+    const testName =
+      resultMatch[3].trim();
+
+    const declarationMatched =
+      pendingSubtest !== null &&
+      pendingSubtest.testName ===
+        testName;
+
+    results.push({
+      failed:
+        resultMatch[1] === "not ",
+      testNumber:
+        Number(resultMatch[2]),
+      testName,
+      resultLineIndex: lineIndex,
+      blockStartLineIndex:
+        declarationMatched
+          ? pendingSubtest.lineIndex
+          : lineIndex,
+      declarationMatched,
+    });
+
+    pendingSubtest = null;
   }
 
-  return failedSubtests;
+  return results.map(
+    (result, index) => {
+      const nextResult =
+        results[index + 1];
+
+      let blockEndLineIndex =
+        nextResult === undefined
+          ? lines.length
+          : nextResult
+              .blockStartLineIndex;
+
+      for (
+        let lineIndex =
+          result.resultLineIndex + 1;
+        lineIndex <
+          blockEndLineIndex;
+        lineIndex += 1
+      ) {
+        if (
+          /^1\.\.[0-9]+$/
+            .test(lines[lineIndex]) ||
+          /^# tests [0-9]+$/
+            .test(lines[lineIndex])
+        ) {
+          blockEndLineIndex =
+            lineIndex;
+          break;
+        }
+      }
+
+      return {
+        ...result,
+        block: lines
+          .slice(
+            result.blockStartLineIndex,
+            blockEndLineIndex,
+          )
+          .join("\n"),
+      };
+    },
+  );
 }
 
 function createClassification({
@@ -335,8 +421,43 @@ function collectNodeTestEvidence(
   const summary =
     parseSummary(output);
 
+  const testResults =
+    parseTopLevelTestResults(output);
+
+  const topLevelSubtestCount =
+    (
+      output.match(
+        /^# Subtest: .+$/gm,
+      ) ?? []
+    ).length;
+
+  const uniqueTestNumbers =
+    new Set(
+      testResults.map(
+        (result) =>
+          result.testNumber,
+      ),
+    );
+
+  const tapResultStructureValid =
+    topLevelSubtestCount ===
+      testResults.length &&
+    uniqueTestNumbers.size ===
+      testResults.length &&
+    testResults.every(
+      (result) =>
+        result.declarationMatched,
+    );
+
+  const failedTestResults =
+    testResults.filter(
+      (result) => result.failed,
+    );
+
   const failedSubtests =
-    parseFailedSubtests(output);
+    failedTestResults.map(
+      (result) => result.testName,
+    );
 
   const assertionObserved =
     /code:\s*['"]ERR_ASSERTION['"]/m
@@ -375,6 +496,8 @@ function collectNodeTestEvidence(
     tapVersionPresent,
     summary,
     failedSubtests,
+    failedTestResults,
+    tapResultStructureValid,
     assertionObserved,
     loadFailureObserved,
     hasCompleteSummary,
@@ -705,6 +828,8 @@ function validateExpectedFailure(value) {
   if (
     typeof value.testName !== "string" ||
     value.testName.length === 0 ||
+    value.testName.trim() !==
+      value.testName ||
     value.testName.includes("\0") ||
     value.testName.includes("\n") ||
     value.testName.includes("\r")
@@ -717,7 +842,8 @@ function validateExpectedFailure(value) {
   if (
     !Array.isArray(
       value.outputIncludes,
-    )
+    ) ||
+    value.outputIncludes.length === 0
   ) {
     throw new Error(
       "invalid_expected_failure_fragments",
@@ -750,11 +876,174 @@ function validateExpectedFailure(value) {
   }
 }
 
+function normalizeExpectedFailures(input) {
+  const hasExpectedFailure =
+    Object.hasOwn(
+      input,
+      "expectedFailure",
+    );
+
+  const hasExpectedFailures =
+    Object.hasOwn(
+      input,
+      "expectedFailures",
+    );
+
+  if (
+    hasExpectedFailure ===
+    hasExpectedFailures
+  ) {
+    throw new Error(
+      hasExpectedFailure
+        ? "conflicting_expected_failure_inputs"
+        : "missing_expected_failure_input",
+    );
+  }
+
+  if (hasExpectedFailure) {
+    validateExpectedFailure(
+      input.expectedFailure,
+    );
+
+    return [
+      {
+        testName:
+          input.expectedFailure
+            .testName,
+        outputIncludes: [
+          ...input.expectedFailure
+            .outputIncludes,
+        ],
+      },
+    ];
+  }
+
+  if (
+    !Array.isArray(
+      input.expectedFailures,
+    )
+  ) {
+    throw new Error(
+      "invalid_expected_failures",
+    );
+  }
+
+  if (
+    input.expectedFailures.length === 0
+  ) {
+    throw new Error(
+      "empty_expected_failures",
+    );
+  }
+
+  const seenTestNames = new Set();
+
+  return input.expectedFailures.map(
+    (expectedFailure) => {
+      validateExpectedFailure(
+        expectedFailure,
+      );
+
+      if (
+        seenTestNames.has(
+          expectedFailure.testName,
+        )
+      ) {
+        throw new Error(
+          "duplicate_expected_failure_test_name",
+        );
+      }
+
+      seenTestNames.add(
+        expectedFailure.testName,
+      );
+
+      return {
+        testName:
+          expectedFailure.testName,
+        outputIncludes: [
+          ...expectedFailure
+            .outputIncludes,
+        ],
+      };
+    },
+  );
+}
+
+function singleDiagnosticValue(
+  block,
+  key,
+) {
+  const pattern = new RegExp(
+    `^  ${key}: ['\"]([^'\"]+)['\"]$`,
+    "gm",
+  );
+
+  const values = [];
+  let match;
+
+  while (
+    (
+      match = pattern.exec(block)
+    ) !== null
+  ) {
+    values.push(match[1]);
+  }
+
+  return values.length === 1
+    ? values[0]
+    : null;
+}
+
+function classifyExpectedFailureBlock(
+  failedTestResult,
+) {
+  if (
+    !failedTestResult
+      .declarationMatched
+  ) {
+    return null;
+  }
+
+  const failureType =
+    singleDiagnosticValue(
+      failedTestResult.block,
+      "failureType",
+    );
+
+  const code = singleDiagnosticValue(
+    failedTestResult.block,
+    "code",
+  );
+
+  const runnerFailure =
+    /^  exitCode: /m.test(
+      failedTestResult.block,
+    ) ||
+    /^  signal: /m.test(
+      failedTestResult.block,
+    ) ||
+    /^  error: ['\"]test failed['\"]$/m
+      .test(failedTestResult.block);
+
+  if (
+    failureType !==
+      "testCodeFailure" ||
+    code === null ||
+    runnerFailure
+  ) {
+    return null;
+  }
+
+  return code === "ERR_ASSERTION"
+    ? "assertion"
+    : "test";
+}
+
 /**
- * Promotes only an explicitly matched assertion failure to
- * TEST_ASSERTION_FAILURE.
+ * Promotes only an exact, explicitly matched failure set.
  *
- * A generic assertion failure remains INCONCLUSIVE.
+ * A generic or partially matched failure remains INCONCLUSIVE.
  */
 export function classifyExpectedNodeTestRegression(
   input = {},
@@ -762,12 +1051,10 @@ export function classifyExpectedNodeTestRegression(
   const {
     executionResult,
     expectedTestCount,
-    expectedFailure,
   } = input;
 
-  validateExpectedFailure(
-    expectedFailure,
-  );
+  const expectedFailures =
+    normalizeExpectedFailures(input);
 
   const classification =
     classifyNodeTestExecution({
@@ -785,56 +1072,133 @@ export function classifyExpectedNodeTestRegression(
   if (
     classification.reasonCode !==
     NODE_TEST_REASON_CODES
-      .ASSERTION_REQUIRES_EXPECTATION
+      .ASSERTION_REQUIRES_EXPECTATION &&
+    classification.reasonCode !==
+    NODE_TEST_REASON_CODES
+      .UNSUPPORTED_TEST_FAILURE
   ) {
     return classification;
   }
 
-  const output =
-    `${executionResult.stdout}` +
-    `${executionResult.stderr}`;
+  const evidence =
+    collectNodeTestEvidence(
+      executionResult,
+    );
 
-  const namedFailureObserved =
-    classification.failedSubtests
-      .includes(
-        expectedFailure.testName,
-      );
+  const actualFailures =
+    evidence.failedTestResults;
 
-  const fragmentsObserved =
-    expectedFailure.outputIncludes
-      .every(
-        (fragment) =>
-          output.includes(fragment),
-      );
+  const actualTestNames =
+    actualFailures.map(
+      (failure) => failure.testName,
+    );
+
+  const uniqueActualTestNames =
+    new Set(actualTestNames);
+
+  const expectedByTestName =
+    new Map(
+      expectedFailures.map(
+        (expectedFailure) => [
+          expectedFailure.testName,
+          expectedFailure,
+        ],
+      ),
+    );
 
   const expectedCountsObserved =
     executionResult.exitCode === 1 &&
     classification.summary.tests ===
       expectedTestCount &&
     classification.summary.pass ===
-      expectedTestCount - 1 &&
-    classification.summary.fail === 1 &&
+      expectedTestCount -
+        expectedFailures.length &&
+    classification.summary.fail ===
+      expectedFailures.length &&
     classification.summary.cancelled ===
       0 &&
     classification.summary.skipped ===
       0 &&
     classification.summary.todo === 0;
 
+  const exactFailureSetObserved =
+    evidence.tapResultStructureValid &&
+    actualFailures.length ===
+      expectedFailures.length &&
+    uniqueActualTestNames.size ===
+      actualFailures.length &&
+    actualFailures.every(
+      (failure) =>
+        expectedByTestName.has(
+          failure.testName,
+        ),
+    );
+
+  const matchedFailureKinds =
+    exactFailureSetObserved
+      ? actualFailures.map(
+          (failure) => {
+            const expectedFailure =
+              expectedByTestName.get(
+                failure.testName,
+              );
+
+            const fragmentsObserved =
+              expectedFailure
+                .outputIncludes
+                .every(
+                  (fragment) =>
+                    failure.block
+                      .includes(
+                        fragment,
+                      ),
+                );
+
+            if (!fragmentsObserved) {
+              return null;
+            }
+
+            return classifyExpectedFailureBlock(
+              failure,
+            );
+          },
+        )
+      : [];
+
+  const everyFailureMatched =
+    matchedFailureKinds.length ===
+      expectedFailures.length &&
+    matchedFailureKinds.every(
+      (kind) => kind !== null,
+    );
+
   if (
-    namedFailureObserved &&
-    fragmentsObserved &&
-    expectedCountsObserved
+    expectedCountsObserved &&
+    exactFailureSetObserved &&
+    everyFailureMatched
   ) {
+    const assertionsOnly =
+      matchedFailureKinds.every(
+        (kind) =>
+          kind === "assertion",
+      );
+
     return {
       ...classification,
 
       outcome:
-        NODE_TEST_OUTCOMES
-          .TEST_ASSERTION_FAILURE,
+        assertionsOnly
+          ? NODE_TEST_OUTCOMES
+              .TEST_ASSERTION_FAILURE
+          : NODE_TEST_OUTCOMES
+              .EXPECTED_TEST_FAILURE,
 
       reasonCode:
-        NODE_TEST_REASON_CODES
-          .EXPECTED_ASSERTION_FAILURE_OBSERVED,
+        assertionsOnly
+          ? NODE_TEST_REASON_CODES
+              .EXPECTED_ASSERTION_FAILURE_OBSERVED
+          : NODE_TEST_REASON_CODES
+              .EXPECTED_TEST_FAILURE_SET_OBSERVED,
     };
   }
 

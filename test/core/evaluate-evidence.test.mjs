@@ -68,6 +68,19 @@ const scenarios = [
   },
   {
     name:
+      "operational error overrides an exact expected test-failure set",
+
+    input: evidence({
+      stateC: state(
+        "EXPECTED_TEST_FAILURE",
+        true,
+      ),
+    }),
+
+    expected: VERDICTS.OPERATIONAL_ERROR,
+  },
+  {
+    name:
       "base failure overrides head, boundary, and State C evidence",
 
     input: evidence({
@@ -105,10 +118,37 @@ const scenarios = [
   },
   {
     name:
+      "invalid envelope overrides an exact expected test-failure set",
+
+    input: evidence({
+      stateC: state(
+        "EXPECTED_TEST_FAILURE",
+      ),
+      boundary: { valid: false },
+    }),
+
+    expected: VERDICTS.INVALID_TEST_ENVELOPE,
+  },
+  {
+    name:
       "expected assertion failure demonstrates discrimination",
 
     input: evidence({
       stateC: state("TEST_ASSERTION_FAILURE"),
+      boundary: { valid: true },
+    }),
+
+    expected:
+      VERDICTS.OBSERVED_TEST_DISCRIMINATION,
+  },
+  {
+    name:
+      "exact expected test-failure set demonstrates discrimination",
+
+    input: evidence({
+      stateC: state(
+        "EXPECTED_TEST_FAILURE",
+      ),
       boundary: { valid: true },
     }),
 
@@ -177,6 +217,29 @@ test(
         },
       );
     }
+  },
+);
+
+test(
+  "the exact expected test-failure verdict has a non-assertion-specific reason",
+  () => {
+    const actual = evaluateEvidence(
+      evidence({
+        stateC: state(
+          "EXPECTED_TEST_FAILURE",
+        ),
+      }),
+    );
+
+    assert.equal(
+      actual.verdict,
+      VERDICTS
+        .OBSERVED_TEST_DISCRIMINATION,
+    );
+    assert.equal(
+      actual.reason,
+      "The selected head test produced the exact expected failure set against the exact base implementation.",
+    );
   },
 );
 

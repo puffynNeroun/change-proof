@@ -26,6 +26,9 @@ const REASONS = Object.freeze({
   OBSERVED_TEST_DISCRIMINATION:
     "The selected head test failed at the expected assertion against the exact base implementation.",
 
+  EXPECTED_TEST_FAILURE:
+    "The selected head test produced the exact expected failure set against the exact base implementation.",
+
   NON_DISCRIMINATING_TESTS:
     "The selected head test also passed against the exact base implementation.",
 
@@ -39,10 +42,13 @@ function requireEvidenceObject(name, value) {
   }
 }
 
-function result(verdict) {
+function result(
+  verdict,
+  reason = REASONS[verdict],
+) {
   return {
     verdict,
-    reason: REASONS[verdict],
+    reason,
   };
 }
 
@@ -98,9 +104,22 @@ export function evaluateEvidence(input = {}) {
     return result(VERDICTS.INVALID_TEST_ENVELOPE);
   }
 
-  if (stateC.outcome === "TEST_ASSERTION_FAILURE") {
+  if (
+    stateC.outcome ===
+      "TEST_ASSERTION_FAILURE"
+  ) {
     return result(
       VERDICTS.OBSERVED_TEST_DISCRIMINATION,
+    );
+  }
+
+  if (
+    stateC.outcome ===
+      "EXPECTED_TEST_FAILURE"
+  ) {
+    return result(
+      VERDICTS.OBSERVED_TEST_DISCRIMINATION,
+      REASONS.EXPECTED_TEST_FAILURE,
     );
   }
 

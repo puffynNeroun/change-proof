@@ -498,37 +498,48 @@ export function createExplicitEnvelopeMaterializer(
     paths,
   ) {
     const entries = {};
+    const orderedPaths = [...paths].sort();
 
-    for (const path of paths) {
+    for (const path of orderedPaths) {
       entries[path] = null;
     }
 
-    if (paths.length === 0) {
-      return entries;
-    }
+    for (const requestedPath of orderedPaths) {
+      const result = await runGit(
+        repositoryRoot,
+        [
+          "ls-tree",
+          "-z",
+          "--full-tree",
+          commitId,
+          "--",
+          requestedPath,
+        ],
+      );
 
-    const result = await runGit(
-      repositoryRoot,
-      [
-        "ls-tree",
-        "-z",
-        "--full-tree",
-        commitId,
-        "--",
-        ...paths,
-      ],
-    );
+      verifyExecution(
+        result,
+        "read_tree_entries",
+        EXPLICIT_ENVELOPE_ERROR_CODES.INCOMPLETE_EVIDENCE,
+      );
 
-    verifyExecution(
-      result,
-      "read_tree_entries",
-      EXPLICIT_ENVELOPE_ERROR_CODES.INCOMPLETE_EVIDENCE,
-    );
+      const records = parseNulRecords(
+        result.stdout,
+        "parse_tree_entries",
+      );
 
-    for (const record of parseNulRecords(
-      result.stdout,
-      "parse_tree_entries",
-    )) {
+      if (records.length === 0) {
+        continue;
+      }
+
+      if (records.length !== 1) {
+        throw materializationError(
+          EXPLICIT_ENVELOPE_ERROR_CODES.MALFORMED_NUL_OUTPUT,
+          "parse_tree_entries",
+        );
+      }
+
+      const [record] = records;
       const separator = record.indexOf("\t");
 
       if (separator < 1) {
@@ -541,14 +552,14 @@ export function createExplicitEnvelopeMaterializer(
       const metadata = record
         .slice(0, separator)
         .split(" ");
-      const path = record.slice(separator + 1);
+      const returnedPath = record.slice(separator + 1);
 
       if (
         metadata.length !== 3 ||
         !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
           .test(metadata[2]) ||
-        !Object.hasOwn(entries, path) ||
-        entries[path] !== null
+        returnedPath !== requestedPath ||
+        entries[requestedPath] !== null
       ) {
         throw materializationError(
           EXPLICIT_ENVELOPE_ERROR_CODES.MALFORMED_NUL_OUTPUT,
@@ -556,7 +567,7 @@ export function createExplicitEnvelopeMaterializer(
         );
       }
 
-      entries[path] = {
+      entries[requestedPath] = {
         mode: metadata[0],
         type: metadata[1],
         objectId: metadata[2],

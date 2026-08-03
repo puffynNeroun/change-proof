@@ -203,6 +203,7 @@ async function runEnvelope(
 async function expectMaterializationError(
   operation,
   code,
+  expectedOperation = null,
 ) {
   await assert.rejects(
     operation,
@@ -213,6 +214,12 @@ async function expectMaterializationError(
         true,
       );
       assert.equal(error.code, code);
+      if (expectedOperation !== null) {
+        assert.equal(
+          error.operation,
+          expectedOperation,
+        );
+      }
       assert.equal(
         Object.hasOwn(error, "stdout"),
         false,
@@ -272,6 +279,11 @@ function createSpecialRepository(name, setup) {
 async function runSpecialEnvelope(
   special,
   includedPaths,
+  {
+    materializerConfigurationOverride =
+      processConfiguration(),
+    inspect = (result) => result,
+  } = {},
 ) {
   const lifecycle = createOwnedWorkspaceLifecycle({
     ...lifecycleConfiguration(),
@@ -279,17 +291,21 @@ async function runSpecialEnvelope(
   });
   const materializer =
     createExplicitEnvelopeMaterializer(
-      processConfiguration(),
+      materializerConfigurationOverride,
     );
 
   return await lifecycle.withOwnedWorkspace(
-    (invocation) => materializer
-      .materializeExplicitEnvelope(invocation, {
-        repositoryRoot: special.root,
-        baseCommitId: special.base,
-        headCommitId: special.head,
-        includedPaths,
-      }),
+    async (invocation) => {
+      const result = await materializer
+        .materializeExplicitEnvelope(invocation, {
+          repositoryRoot: special.root,
+          baseCommitId: special.base,
+          headCommitId: special.head,
+          includedPaths,
+        });
+
+      return await inspect(result, invocation);
+    },
   );
 }
 
@@ -382,6 +398,21 @@ before(() => {
       "const mode = process.env.CHANGE_PROOF_SHIM_MODE;",
       "const command = args.find((item) => ['restore','diff','ls-files','ls-tree','rev-parse'].includes(item));",
       "const has = (...items) => items.every((item) => args.includes(item));",
+      "const separator = args.indexOf('--');",
+      "const requestedPath = separator < 0 ? null : args[separator + 1];",
+      "const validTreeRecord = (path) => `100644 blob ${'a'.repeat(40)}\\t${path}\\0`;",
+      "if (command === 'ls-tree' && process.env.CHANGE_PROOF_TREE_LOG) { appendFileSync(process.env.CHANGE_PROOF_TREE_LOG, `${JSON.stringify(args)}\\n`); }",
+      "if (mode === 'tree-timeout' && command === 'ls-tree') { setInterval(() => {}, 1000); await new Promise(() => {}); }",
+      "if (mode === 'tree-signal' && command === 'ls-tree') { process.kill(process.pid, 'SIGTERM'); }",
+      "if (mode === 'tree-process-failure' && command === 'ls-tree') { process.stderr.write('bounded tree failure'); process.exit(9); }",
+      "if (mode === 'tree-stdout-truncated' && command === 'ls-tree') { writeFileSync(1, 'x'.repeat(2 * 1024 * 1024)); process.exit(0); }",
+      "if (mode === 'tree-stderr-truncated' && command === 'ls-tree') { writeFileSync(2, 'x'.repeat(2 * 1024 * 1024)); process.exit(9); }",
+      "if (mode === 'tree-multiple' && command === 'ls-tree') { process.stdout.write(validTreeRecord(requestedPath) + validTreeRecord('other')); process.exit(0); }",
+      "if (mode === 'tree-duplicate' && command === 'ls-tree') { process.stdout.write(validTreeRecord(requestedPath).repeat(2)); process.exit(0); }",
+      "if (mode === 'tree-mismatch' && command === 'ls-tree') { process.stdout.write(validTreeRecord('unexpected')); process.exit(0); }",
+      "if (mode === 'tree-malformed-metadata' && command === 'ls-tree') { process.stdout.write(`100644 blob\\t${requestedPath}\\0`); process.exit(0); }",
+      "if (mode === 'tree-malformed-nul' && command === 'ls-tree') { process.stdout.write(validTreeRecord(requestedPath).slice(0, -1)); process.exit(0); }",
+      "if (mode === 'tree-replacement' && command === 'ls-tree') { process.stdout.write('\\uFFFD\\0'); process.exit(0); }",
       "if (mode === 'timeout' && command === 'restore') { setInterval(() => {}, 1000); await new Promise(() => {}); }",
       "if (mode === 'signal' && command === 'restore') { process.kill(process.pid, 'SIGTERM'); }",
       "if (mode === 'restore-fail' && command === 'restore') { process.stderr.write('bounded restore failure'); process.exit(9); }",
@@ -561,6 +592,294 @@ test(
             .UNSAFE_PATH,
         ),
       );
+    }
+  },
+);
+
+test(
+  "looks up nested changed paths and shared ancestors exactly",
+  async () => {
+    const sourcePath =
+      "tools/forge-validator/src/pr-watch.mjs";
+    const selectedTestPath =
+      "tools/forge-validator/test/pr-watch.test.mjs";
+    const requestedPaths = [
+      "tools",
+      "tools/forge-validator",
+      "tools/forge-validator/src",
+      sourcePath,
+      "tools/forge-validator/test",
+      selectedTestPath,
+    ];
+    const unrelatedPaths = [
+      "tools/forge-validator/README.md",
+      "tools/forge-validator/package.json",
+      "tools/forge-validator/src/cli.mjs",
+      "tools/forge-validator/src/unrelated.mjs",
+      "tools/forge-validator/test/cli.test.mjs",
+      "tools/forge-validator/test/unrelated.test.mjs",
+    ];
+    const special = createSpecialRepository(
+      "nested exact lookup repository",
+      ({ write, git }) => {
+        write(sourcePath, "base source\n");
+        write(selectedTestPath, "base test\n");
+
+        for (const path of unrelatedPaths) {
+          write(path, `unchanged ${path}\n`);
+        }
+
+        git(["add", "-A"]);
+        git(["commit", "-m", "base"]);
+        const base = git(["rev-parse", "HEAD"])
+          .stdout.trim();
+
+        write(sourcePath, "head source\n");
+        write(selectedTestPath, "head test\n");
+        git(["add", "-A"]);
+        git(["commit", "-m", "head"]);
+
+        return {
+          base,
+          head: git(["rev-parse", "HEAD"])
+            .stdout.trim(),
+        };
+      },
+    );
+    const treeLog = join(
+      temporaryRoot,
+      "nested exact lookup commands.jsonl",
+    );
+    const beforeHead = outputGit(
+      ["rev-parse", "HEAD"],
+      special.root,
+    );
+    const beforeStatus = outputGit(
+      ["status", "--porcelain=v1"],
+      special.root,
+    );
+    const beforeRefs = refsSnapshot(special.root);
+    const beforeWorktrees = worktreePaths(special.root);
+    let stateCPath;
+
+    const { value, cleanup } =
+      await runSpecialEnvelope(
+        special,
+        [selectedTestPath],
+        {
+          materializerConfigurationOverride:
+            materializerConfiguration(
+              "tree-log",
+              {
+                environment: {
+                  ...gitEnvironment,
+                  CHANGE_PROOF_REAL_GIT:
+                    gitExecutable,
+                  CHANGE_PROOF_SHIM_MODE:
+                    "tree-log",
+                  CHANGE_PROOF_TREE_LOG: treeLog,
+                },
+              },
+            ),
+          inspect(result) {
+            stateCPath = result.stateCWorktreePath;
+            return result;
+          },
+        },
+      );
+    const loggedCommands = readFileSync(
+      treeLog,
+      "utf8",
+    )
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    const exactLookupCommands =
+      loggedCommands.filter((argumentsList) => {
+        const separator = argumentsList.indexOf("--");
+
+        return (
+          argumentsList.includes("ls-tree") &&
+          argumentsList.includes("--full-tree") &&
+          separator >= 0 &&
+          argumentsList.slice(separator + 1).length === 1
+        );
+      });
+
+    assert.equal(exactLookupCommands.length, 12);
+    assert.deepEqual(
+      exactLookupCommands.map((argumentsList) =>
+        argumentsList.at(-1)),
+      [...requestedPaths, ...requestedPaths],
+    );
+    assert.deepEqual(
+      exactLookupCommands.map((argumentsList) =>
+        argumentsList[argumentsList.indexOf("--") - 1]),
+      [
+        ...Array(requestedPaths.length).fill(special.base),
+        ...Array(requestedPaths.length).fill(special.head),
+      ],
+    );
+
+    for (const argumentsList of exactLookupCommands) {
+      assert.deepEqual(argumentsList.slice(0, 2), [
+        "--no-pager",
+        "--literal-pathspecs",
+      ]);
+      assert.equal(argumentsList.includes("-r"), false);
+      assert.equal(
+        argumentsList.slice(
+          argumentsList.indexOf("--") + 1,
+        ).length,
+        1,
+      );
+    }
+
+    assert.deepEqual(value.evidence.headChangedPaths, [
+      sourcePath,
+      selectedTestPath,
+    ]);
+    assert.deepEqual(value.evidence.includedPaths, [
+      selectedTestPath,
+    ]);
+    assert.deepEqual(
+      value.evidence.excludedChangedPaths,
+      [sourcePath],
+    );
+    assert.deepEqual(value.evidence.materializedPaths, [
+      selectedTestPath,
+    ]);
+    assert.deepEqual(
+      value.evidence.resultingChangedPaths,
+      [selectedTestPath],
+    );
+    assert.equal(
+      value.evidence.stateCBlobIds[selectedTestPath],
+      value.evidence.headBlobIds[selectedTestPath],
+    );
+    assert.equal(
+      value.evidence.stateCBlobIds[sourcePath],
+      value.evidence.baseBlobIds[sourcePath],
+    );
+    assert.equal(value.boundary.boundaryValid, true);
+
+    for (const unrelatedPath of unrelatedPaths) {
+      assert.equal(
+        JSON.stringify(value.evidence)
+          .includes(unrelatedPath),
+        false,
+      );
+    }
+
+    assert.equal(cleanup.cleanupCompleted, true);
+    assert.equal(existsSync(stateCPath), false);
+    assert.deepEqual(
+      worktreePaths(special.root),
+      beforeWorktrees,
+    );
+    assert.equal(
+      outputGit(["rev-parse", "HEAD"], special.root),
+      beforeHead,
+    );
+    assert.equal(
+      outputGit(
+        ["status", "--porcelain=v1"],
+        special.root,
+      ),
+      beforeStatus,
+    );
+    assert.equal(refsSnapshot(special.root), beforeRefs);
+  },
+);
+
+test(
+  "fails closed on invalid exact tree lookup results",
+  async (suite) => {
+    for (const [
+      mode,
+      code,
+      operation,
+      materializerOverrides,
+    ] of [
+      [
+        "tree-multiple",
+        EXPLICIT_ENVELOPE_ERROR_CODES.MALFORMED_NUL_OUTPUT,
+        "parse_tree_entries",
+        {},
+      ],
+      [
+        "tree-duplicate",
+        EXPLICIT_ENVELOPE_ERROR_CODES.MALFORMED_NUL_OUTPUT,
+        "parse_tree_entries",
+        {},
+      ],
+      [
+        "tree-mismatch",
+        EXPLICIT_ENVELOPE_ERROR_CODES.MALFORMED_NUL_OUTPUT,
+        "parse_tree_entries",
+        {},
+      ],
+      [
+        "tree-malformed-metadata",
+        EXPLICIT_ENVELOPE_ERROR_CODES.MALFORMED_NUL_OUTPUT,
+        "parse_tree_entries",
+        {},
+      ],
+      [
+        "tree-malformed-nul",
+        EXPLICIT_ENVELOPE_ERROR_CODES.MALFORMED_NUL_OUTPUT,
+        "parse_tree_entries",
+        {},
+      ],
+      [
+        "tree-replacement",
+        EXPLICIT_ENVELOPE_ERROR_CODES.MALFORMED_NUL_OUTPUT,
+        "parse_tree_entries",
+        {},
+      ],
+      [
+        "tree-process-failure",
+        EXPLICIT_ENVELOPE_ERROR_CODES.INCOMPLETE_EVIDENCE,
+        "read_tree_entries",
+        {},
+      ],
+      [
+        "tree-timeout",
+        EXPLICIT_ENVELOPE_ERROR_CODES.GIT_TIMEOUT,
+        "read_tree_entries",
+        { timeoutMs: 250 },
+      ],
+      [
+        "tree-signal",
+        EXPLICIT_ENVELOPE_ERROR_CODES.GIT_SIGNAL,
+        "read_tree_entries",
+        {},
+      ],
+      [
+        "tree-stdout-truncated",
+        EXPLICIT_ENVELOPE_ERROR_CODES.GIT_STDOUT_TRUNCATED,
+        "read_tree_entries",
+        {},
+      ],
+      [
+        "tree-stderr-truncated",
+        EXPLICIT_ENVELOPE_ERROR_CODES.GIT_STDERR_TRUNCATED,
+        "read_tree_entries",
+        {},
+      ],
+    ]) {
+      await suite.test(mode, () =>
+        expectMaterializationError(
+          () => runEnvelope(
+            [paths.modified],
+            {
+              mode,
+              materializerOverrides,
+            },
+          ),
+          code,
+          operation,
+        ));
     }
   },
 );
@@ -1452,6 +1771,9 @@ test(
 
     for (const forbidden of [
       "node:child_process",
+      "spawnSync",
+      "execSync",
+      "execFileSync",
       "process.env",
       "shell:",
       '"commit"',

@@ -56,6 +56,7 @@ function assertionTap({
     `# Subtest: ${testName}`,
     `not ok 2 - ${testName}`,
     actualLine,
+    "  failureType: 'testCodeFailure'",
     "  code: 'ERR_ASSERTION'",
     `# tests ${testCount}`,
     `# pass ${passCount}`,
@@ -65,6 +66,89 @@ function assertionTap({
     "# todo 0",
     "",
   ].join("\n");
+}
+
+function failureSetTap({
+  failures,
+  passCount = 0,
+  cancelled = 0,
+  skipped = 0,
+  todo = 0,
+}) {
+  const lines = [
+    "TAP version 13",
+  ];
+
+  let testNumber = 1;
+
+  for (
+    let index = 0;
+    index < passCount;
+    index += 1
+  ) {
+    const testName =
+      `passing test ${index + 1}`;
+
+    lines.push(
+      `# Subtest: ${testName}`,
+      `ok ${testNumber} - ${testName}`,
+      "  ---",
+      "  duration_ms: 1",
+      "  type: 'test'",
+      "  ...",
+    );
+
+    testNumber += 1;
+  }
+
+  for (const failure of failures) {
+    lines.push(
+      `# Subtest: ${failure.testName}`,
+      `not ok ${testNumber} - ${failure.testName}`,
+      "  ---",
+      "  duration_ms: 1",
+      "  type: 'test'",
+      "  location: '/tmp/test.mjs:1:1'",
+      `  failureType: '${failure.failureType ?? "testCodeFailure"}'`,
+      `  error: '${failure.error ?? "expected failure"}'`,
+      ...(failure.diagnosticLines ?? []),
+      `  code: '${failure.code ?? "ERR_ASSERTION"}'`,
+      ...(failure.extraLines ?? []),
+      "  ...",
+    );
+
+    testNumber += 1;
+  }
+
+  const testCount =
+    passCount + failures.length;
+
+  lines.push(
+    `1..${testCount}`,
+    `# tests ${testCount}`,
+    `# pass ${passCount}`,
+    `# fail ${failures.length}`,
+    `# cancelled ${cancelled}`,
+    `# skipped ${skipped}`,
+    `# todo ${todo}`,
+    "",
+  );
+
+  return lines.join("\n");
+}
+
+function specificationFor(
+  failure,
+) {
+  return {
+    testName: failure.testName,
+    outputIncludes:
+      failure.outputIncludes ?? [
+        `code: '${failure.code ?? "ERR_ASSERTION"}'`,
+        failure.error ??
+          "expected failure",
+      ],
+  };
 }
 
 function expectedFailure(
@@ -1104,6 +1188,28 @@ test(
       },
     );
 
+    assert.throws(
+      () =>
+        classifyExpectedNodeTestRegression({
+          executionResult:
+            execution({
+              stdout: passTap(1),
+            }),
+
+          expectedTestCount: 1,
+
+          expectedFailure: {
+            testName: "test",
+            outputIncludes: [],
+          },
+        }),
+
+      {
+        message:
+          "invalid_expected_failure_fragments",
+      },
+    );
+
     for (const fragment of [
       null,
       "",
@@ -1160,6 +1266,871 @@ test(
           "duplicate_expected_failure_fragment",
       },
     );
+  },
+);
+
+test(
+  "classifies an exact two-assertion failure set",
+  () => {
+    const failures = [
+      {
+        testName: "first assertion",
+        diagnosticLines: [
+          "    first actual value",
+        ],
+      },
+      {
+        testName: "second assertion",
+        diagnosticLines: [
+          "    second actual value",
+        ],
+      },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures,
+              passCount: 2,
+            }),
+          }),
+        expectedTestCount: 4,
+        expectedFailures:
+          failures.map(
+            specificationFor,
+          ),
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES
+        .TEST_ASSERTION_FAILURE,
+    );
+    assert.equal(
+      result.reasonCode,
+      NODE_TEST_REASON_CODES
+        .EXPECTED_ASSERTION_FAILURE_OBSERVED,
+    );
+  },
+);
+
+test(
+  "classifies an exact mixed failure set",
+  () => {
+    const failures = [
+      {
+        testName: "assertion regression",
+        diagnosticLines: [
+          "    actual differs",
+        ],
+      },
+      {
+        testName: "expected thrown test failure",
+        code: "ERR_TEST_FAILURE",
+        error:
+          "Unexpected command: pr checks 89 --watch",
+      },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures,
+              passCount: 1,
+            }),
+          }),
+        expectedTestCount: 3,
+        expectedFailures:
+          failures.map(
+            specificationFor,
+          ),
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES
+        .EXPECTED_TEST_FAILURE,
+    );
+    assert.equal(
+      result.reasonCode,
+      NODE_TEST_REASON_CODES
+        .EXPECTED_TEST_FAILURE_SET_OBSERVED,
+    );
+    assert.equal(
+      result.invalidFailure,
+      false,
+    );
+  },
+);
+
+test(
+  "classifies the exact eight-failure pilot-shaped set",
+  () => {
+    const failures = [
+      {
+        testName:
+          "collectPrWatchStatus handles immediately registered passing checks",
+        diagnosticLines: [
+          "    - 'passed'",
+        ],
+        outputIncludes: [
+          "code: 'ERR_ASSERTION'",
+          "- 'passed'",
+        ],
+      },
+      {
+        testName:
+          "collectPrWatchStatus reports persistent missing checks without starting watch",
+        diagnosticLines: [
+          "    + 'missing'",
+          "    - 'not_registered'",
+        ],
+        outputIncludes: [
+          "code: 'ERR_ASSERTION'",
+          "+ 'missing'",
+          "- 'not_registered'",
+        ],
+      },
+      {
+        testName:
+          "collectPrWatchStatus preserves failing final checks",
+        diagnosticLines: [
+          "    - 'failed'",
+        ],
+        outputIncludes: [
+          "code: 'ERR_ASSERTION'",
+          "- 'failed'",
+        ],
+      },
+      {
+        testName:
+          "collectPrWatchStatus preserves pending final checks",
+        diagnosticLines: [
+          "    - 'pending'",
+        ],
+        outputIncludes: [
+          "code: 'ERR_ASSERTION'",
+          "- 'pending'",
+        ],
+      },
+      {
+        testName:
+          "collectPrWatchStatus times out a bounded watch",
+        diagnosticLines: [
+          "    - 1234",
+        ],
+        outputIncludes: [
+          "code: 'ERR_ASSERTION'",
+          "- 1234",
+        ],
+      },
+      {
+        testName:
+          "collectPrWatchStatus rejects a head change before watch",
+        code: "ERR_TEST_FAILURE",
+        error:
+          "Unexpected command: pr checks 89 --watch",
+        outputIncludes: [
+          "code: 'ERR_TEST_FAILURE'",
+          "Unexpected command: pr checks 89 --watch",
+        ],
+      },
+      {
+        testName:
+          "collectPrWatchStatus rejects a head change after watch",
+        diagnosticLines: [
+          "    + 'passing'",
+          "    - 'head_changed'",
+        ],
+        outputIncludes: [
+          "code: 'ERR_ASSERTION'",
+          "+ 'passing'",
+          "- 'head_changed'",
+        ],
+      },
+      {
+        testName:
+          "collectPrWatchStatus classifies cancelled checks as failed",
+        diagnosticLines: [
+          "    - 'failed'",
+        ],
+        outputIncludes: [
+          "code: 'ERR_ASSERTION'",
+          "- 'failed'",
+        ],
+      },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures,
+              passCount: 16,
+            }),
+          }),
+        expectedTestCount: 24,
+        expectedFailures:
+          failures.map(
+            specificationFor,
+          ),
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES
+        .EXPECTED_TEST_FAILURE,
+    );
+    assert.deepEqual(
+      result.summary,
+      {
+        tests: 24,
+        pass: 16,
+        fail: 8,
+        cancelled: 0,
+        skipped: 0,
+        todo: 0,
+      },
+    );
+  },
+);
+
+test(
+  "rejects an expected failure count larger than the actual set",
+  () => {
+    const actual = {
+      testName: "only actual failure",
+    };
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures: [actual],
+            }),
+          }),
+        expectedTestCount: 1,
+        expectedFailures: [
+          specificationFor(actual),
+          specificationFor({
+            testName: "missing failure",
+          }),
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+  },
+);
+
+test(
+  "rejects an unexpected extra failed test",
+  () => {
+    const failures = [
+      { testName: "expected failure" },
+      { testName: "unexpected failure" },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures,
+            }),
+          }),
+        expectedTestCount: 2,
+        expectedFailures: [
+          specificationFor(failures[0]),
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+  },
+);
+
+test(
+  "rejects a missing expected failed test",
+  () => {
+    const actualFailures = [
+      { testName: "expected failure" },
+      { testName: "different actual failure" },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures: actualFailures,
+            }),
+          }),
+        expectedTestCount: 2,
+        expectedFailures: [
+          specificationFor(
+            actualFailures[0],
+          ),
+          specificationFor({
+            testName: "missing expected failure",
+          }),
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+  },
+);
+
+test(
+  "rejects duplicate expected test names",
+  () => {
+    const specification =
+      specificationFor({
+        testName: "duplicate",
+      });
+
+    assert.throws(
+      () =>
+        classifyExpectedNodeTestRegression({
+          executionResult:
+            execution({
+              stdout: passTap(1),
+            }),
+          expectedTestCount: 1,
+          expectedFailures: [
+            specification,
+            { ...specification },
+          ],
+        }),
+      {
+        message:
+          "duplicate_expected_failure_test_name",
+      },
+    );
+  },
+);
+
+test(
+  "rejects empty, conflicting, and missing expected failure inputs",
+  () => {
+    const common = {
+      executionResult:
+        execution({
+          stdout: passTap(1),
+        }),
+      expectedTestCount: 1,
+    };
+
+    assert.throws(
+      () =>
+        classifyExpectedNodeTestRegression({
+          ...common,
+          expectedFailures: [],
+        }),
+      { message: "empty_expected_failures" },
+    );
+
+    assert.throws(
+      () =>
+        classifyExpectedNodeTestRegression({
+          ...common,
+          expectedFailure:
+            expectedFailure(),
+          expectedFailures: [
+            expectedFailure(),
+          ],
+        }),
+      {
+        message:
+          "conflicting_expected_failure_inputs",
+      },
+    );
+
+    assert.throws(
+      () =>
+        classifyExpectedNodeTestRegression(
+          common,
+        ),
+      {
+        message:
+          "missing_expected_failure_input",
+      },
+    );
+  },
+);
+
+test(
+  "does not match fragments from another failure block",
+  () => {
+    const failures = [
+      {
+        testName: "first failure",
+        diagnosticLines: [
+          "    fragment-for-second",
+        ],
+      },
+      {
+        testName: "second failure",
+        diagnosticLines: [
+          "    fragment-for-first",
+        ],
+      },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures,
+            }),
+          }),
+        expectedTestCount: 2,
+        expectedFailures: [
+          {
+            testName: "first failure",
+            outputIncludes: [
+              "fragment-for-first",
+            ],
+          },
+          {
+            testName: "second failure",
+            outputIncludes: [
+              "fragment-for-second",
+            ],
+          },
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+  },
+);
+
+test(
+  "rejects duplicate actual failed-test identities",
+  () => {
+    const failures = [
+      { testName: "duplicate actual" },
+      { testName: "duplicate actual" },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures,
+            }),
+          }),
+        expectedTestCount: 2,
+        expectedFailures: [
+          specificationFor(failures[0]),
+          specificationFor({
+            testName: "other expected",
+          }),
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+  },
+);
+
+test(
+  "rejects orphan and ambiguous top-level TAP records",
+  () => {
+    const failure = {
+      testName: "expected failure",
+    };
+
+    const validTap = failureSetTap({
+      failures: [failure],
+    });
+
+    const orphanTap = validTap.replace(
+      "1..1",
+      [
+        "# Subtest: orphan record",
+        "    expected failure",
+        "1..1",
+      ].join("\n"),
+    );
+
+    const duplicateNumberTap =
+      failureSetTap({
+        failures: [
+          failure,
+          { testName: "other failure" },
+        ],
+      }).replace(
+        "not ok 2 - other failure",
+        "not ok 1 - other failure",
+      );
+
+    const cases = [
+      {
+        stdout: orphanTap,
+        expectedTestCount: 1,
+        expectedFailures: [
+          specificationFor(failure),
+        ],
+      },
+      {
+        stdout: duplicateNumberTap,
+        expectedTestCount: 2,
+        expectedFailures: [
+          specificationFor(failure),
+          specificationFor({
+            testName: "other failure",
+          }),
+        ],
+      },
+    ];
+
+    for (const scenario of cases) {
+      const result =
+        classifyExpectedNodeTestRegression({
+          executionResult:
+            execution({
+              exitCode: 1,
+              stdout: scenario.stdout,
+            }),
+          expectedTestCount:
+            scenario.expectedTestCount,
+          expectedFailures:
+            scenario.expectedFailures,
+        });
+
+      assert.equal(
+        result.outcome,
+        NODE_TEST_OUTCOMES.INCONCLUSIVE,
+      );
+    }
+  },
+);
+
+test(
+  "rejects an exact-looking top-level runner failure",
+  () => {
+    const failure = {
+      testName: "test/example.test.mjs",
+      code: "ERR_TEST_FAILURE",
+      error: "test failed",
+      extraLines: [
+        "  exitCode: 1",
+        "  signal: ~",
+      ],
+    };
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures: [failure],
+            }),
+          }),
+        expectedTestCount: 1,
+        expectedFailures: [
+          specificationFor(failure),
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+  },
+);
+
+test(
+  "rejects an exact-looking hook failure",
+  () => {
+    const failure = {
+      testName: "test with failed hook",
+      code: "ERR_TEST_FAILURE",
+      failureType: "hookFailed",
+      error: "beforeEach hook failed",
+    };
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures: [failure],
+            }),
+          }),
+        expectedTestCount: 1,
+        expectedFailures: [
+          specificationFor(failure),
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+  },
+);
+
+test(
+  "keeps module, timeout, and truncation failures operational",
+  () => {
+    const expectedFailures = [
+      specificationFor({
+        testName: "operational failure",
+      }),
+    ];
+
+    const cases = [
+      execution({
+        exitCode: 1,
+        stderr:
+          "Error [ERR_MODULE_NOT_FOUND]: Cannot find module",
+      }),
+      execution({
+        exitCode: 1,
+        timedOut: true,
+        stdout: "TAP version 13\n",
+      }),
+      execution({
+        exitCode: 1,
+        stdout: failureSetTap({
+          failures: [
+            {
+              testName:
+                "operational failure",
+            },
+          ],
+        }),
+        stdoutTruncated: true,
+      }),
+    ];
+
+    for (const executionResult of cases) {
+      const result =
+        classifyExpectedNodeTestRegression({
+          executionResult,
+          expectedTestCount: 1,
+          expectedFailures,
+        });
+
+      assert.equal(
+        result.invalidFailure,
+        true,
+      );
+      assert.notEqual(
+        result.outcome,
+        NODE_TEST_OUTCOMES
+          .EXPECTED_TEST_FAILURE,
+      );
+    }
+  },
+);
+
+test(
+  "rejects cancelled, skipped, and todo summary counts",
+  () => {
+    const failure = {
+      testName: "expected failure",
+    };
+
+    for (const summaryKey of [
+      "cancelled",
+      "skipped",
+      "todo",
+    ]) {
+      const result =
+        classifyExpectedNodeTestRegression({
+          executionResult:
+            execution({
+              exitCode: 1,
+              stdout: failureSetTap({
+                failures: [failure],
+                [summaryKey]: 1,
+              }),
+            }),
+          expectedTestCount: 1,
+          expectedFailures: [
+            specificationFor(failure),
+          ],
+        });
+
+      assert.equal(
+        result.outcome,
+        NODE_TEST_OUTCOMES.INCONCLUSIVE,
+      );
+    }
+  },
+);
+
+test(
+  "keeps a generic eight-test failure inconclusive",
+  () => {
+    const failures = Array.from(
+      { length: 8 },
+      (_, index) => ({
+        testName:
+          `generic failure ${index + 1}`,
+      }),
+    );
+
+    const result =
+      classifyNodeTestExecution({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: failureSetTap({
+              failures,
+              passCount: 16,
+            }),
+          }),
+        expectedTestCount: 24,
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+    assert.equal(
+      result.reasonCode,
+      NODE_TEST_REASON_CODES
+        .ASSERTION_REQUIRES_EXPECTATION,
+    );
+  },
+);
+
+test(
+  "does not mutate frozen multi-failure input",
+  () => {
+    const failures = [
+      { testName: "first failure" },
+      {
+        testName: "second failure",
+        code: "ERR_TEST_FAILURE",
+      },
+    ];
+
+    const executionResult =
+      Object.freeze(
+        execution({
+          exitCode: 1,
+          stdout: failureSetTap({
+            failures,
+          }),
+        }),
+      );
+
+    const expectedFailures =
+      Object.freeze(
+        failures.map((failure) =>
+          Object.freeze({
+            ...specificationFor(
+              failure,
+            ),
+            outputIncludes:
+              Object.freeze([
+                ...specificationFor(
+                  failure,
+                ).outputIncludes,
+              ]),
+          }),
+        ),
+      );
+
+    const input = Object.freeze({
+      executionResult,
+      expectedTestCount: 2,
+      expectedFailures,
+    });
+
+    const before = JSON.stringify(input);
+    const result =
+      classifyExpectedNodeTestRegression(
+        input,
+      );
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES
+        .EXPECTED_TEST_FAILURE,
+    );
+    assert.equal(
+      JSON.stringify(input),
+      before,
+    );
+  },
+);
+
+test(
+  "classifies equivalent multi-failure inputs deterministically",
+  () => {
+    const failures = [
+      { testName: "first failure" },
+      { testName: "second failure" },
+    ];
+
+    const input = {
+      executionResult:
+        execution({
+          exitCode: 1,
+          stdout: failureSetTap({
+            failures,
+          }),
+        }),
+      expectedTestCount: 2,
+      expectedFailures:
+        failures.map(
+          specificationFor,
+        ),
+    };
+
+    const expected =
+      classifyExpectedNodeTestRegression(
+        input,
+      );
+
+    for (
+      let index = 0;
+      index < 100;
+      index += 1
+    ) {
+      assert.deepEqual(
+        classifyExpectedNodeTestRegression(
+          input,
+        ),
+        expected,
+      );
+    }
   },
 );
 
