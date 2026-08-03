@@ -11,7 +11,7 @@ const fixtureRoot = join(
 );
 
 const result =
-  runControlledFixtureMatrix(fixtureRoot);
+  await runControlledFixtureMatrix(fixtureRoot);
 
 for (const error of result.errors) {
   console.error(error);
