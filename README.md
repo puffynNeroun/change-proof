@@ -4,13 +4,13 @@ Change Proof is a local evidence tool for checking whether explicitly selected c
 
 ## Current status
 
-**Research stage: M3 public CLI beta candidate**
+**Research stage: local v0.1 public CLI beta candidate**
 
-The repository contains a verified production three-state engine and a thin, configuration-driven CLI candidate. The CLI is a beta contract for local evaluation, not a production-readiness or correctness claim.
+The repository contains a verified production three-state engine and a thin, configuration-driven CLI candidate. Its local v0.1 beta evidence model has now been validated on two external repositories: the earlier Rulden pilot and the project-forge nested `node:test` pilot. The CLI is a beta contract for local evaluation, not a stable-release, production-readiness, publication-readiness, or correctness claim.
 
 ## What M2.10 proved
 
-M2.10 ran the production engine against a non-synthetic local repository with immutable base and head commits. It observed:
+M2.10 ran the production engine against the non-synthetic Rulden repository with immutable base and head commits. It observed:
 
 - State A passing 20 of 20 tests;
 - State B passing 24 of 24 tests;
@@ -20,6 +20,16 @@ M2.10 ran the production engine against a non-synthetic local repository with im
 - verified workspace cleanup with no primary-checkout, ref, or worktree-registry mutation.
 
 That pilot demonstrated the engine on one bounded real change. It did not establish general implementation correctness, complete regression coverage, production readiness, or safety for untrusted code.
+
+## External validation
+
+The second external validation exercises the public binary against project-forge's nested Node.js `node:test` CLI suite with one exact selected-test envelope. It is gated on a trusted local checkout:
+
+```text
+CHANGE_PROOF_M4_PROJECT_FORGE_REPOSITORY=/absolute/path/to/project-forge node --test --test-reporter=tap test/integration/m4-project-forge-public-cli.test.mjs
+```
+
+The exact repository, commit, state, dependency-projection, determinism, cleanup, and non-claim contract is recorded in [`docs/M4_SECOND_EXTERNAL_VALIDATION.md`](docs/M4_SECOND_EXTERNAL_VALIDATION.md). These two bounded pilots do not imply broad framework support, automatic framework or dependency discovery, npm publication, GitHub Action availability, release readiness, CI readiness, security-policy readiness, or production sandboxing.
 
 ## Installation status
 
@@ -110,6 +120,7 @@ M3 provides no automatic test, envelope, dependency, environment, or command dis
 - [`src/core`](src/core) — production three-state evidence engine.
 - [`change-proof.config.example.json`](change-proof.config.example.json) — editable strict configuration example.
 - [`docs/M3_PUBLIC_CLI_CONTRACT.md`](docs/M3_PUBLIC_CLI_CONTRACT.md) — M3 beta CLI contract.
+- [`docs/M4_SECOND_EXTERNAL_VALIDATION.md`](docs/M4_SECOND_EXTERNAL_VALIDATION.md) — second external public-CLI validation.
 - [`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md) — evidence model.
 - [`docs/MVP_LIMITATIONS.md`](docs/MVP_LIMITATIONS.md) — research limitations.
 - [`experiments/m1-controlled-fixture`](experiments/m1-controlled-fixture) — deterministic M1 historical experiment.
@@ -121,6 +132,8 @@ M1 established the controlled three-state fixture, deterministic output, fail-fa
 M2 extracted and verified reusable production primitives. M2.10 then exercised the orchestrator on a non-synthetic repository with an exact eight-failure State C contract and verified cleanup and repository immutability.
 
 M3 wraps that engine in the minimum local public CLI beta. It does not replace or duplicate the engine.
+
+M4.2 repeats the local beta evidence observation on project-forge's nested `node:test` CLI suite, providing a second external validation without making a release-readiness claim.
 
 ## License
 
