@@ -70,6 +70,15 @@ Process evidence also records exit code, signal, timeout, process errors, TAP ch
 
 A non-zero exit code alone is insufficient.
 
+Expected failure identities apply to failed leaf test points in valid
+`node:test` TAP. Aggregate suite failures such as `subtestsFailed` are
+structural propagation records, not additional behavioral failures, and are
+excluded from exact failure-set matching. Output fragments are matched only
+within the corresponding leaf record.
+
+Malformed or ambiguous nested TAP remains `INCONCLUSIVE`; nested support does
+not broaden the supported test framework beyond `node:test`.
+
 ## Aggregate verdicts
 
 ### `OBSERVED_TEST_DISCRIMINATION`

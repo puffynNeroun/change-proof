@@ -262,10 +262,73 @@ function summaryComplete(summary) {
   );
 }
 
-function parseTopLevelTestResults(output) {
+function parseNodeTestResults(output) {
   const lines = output.split(/\r?\n/);
   const results = [];
-  let pendingSubtest = null;
+  const topLevelScope = {
+    indentation: 0,
+    results: [],
+    plans: [],
+  };
+  const scopes = [topLevelScope];
+  const pendingSubtests = new Map();
+  let structureValid = true;
+  let nestedTapPresent = false;
+
+  function scopeAt(indentation) {
+    if (indentation === 0) {
+      return topLevelScope;
+    }
+
+    const parent =
+      pendingSubtests.get(
+        indentation - 4,
+      );
+
+    if (parent === undefined) {
+      return null;
+    }
+
+    if (parent.childScope === null) {
+      parent.childScope = {
+        indentation,
+        results: [],
+        plans: [],
+      };
+
+      scopes.push(parent.childScope);
+    }
+
+    return parent.childScope;
+  }
+
+  function validateIndentation(
+    indentation,
+  ) {
+    if (indentation % 4 !== 0) {
+      structureValid = false;
+      return false;
+    }
+
+    if (indentation === 0) {
+      return true;
+    }
+
+    nestedTapPresent = true;
+
+    const parent =
+      pendingSubtests.get(
+        indentation - 4,
+      );
+
+    if (parent === undefined) {
+      structureValid = false;
+      return false;
+    }
+
+    parent.hasNestedScope = true;
+    return true;
+  }
 
   for (
     let lineIndex = 0;
@@ -273,74 +336,231 @@ function parseTopLevelTestResults(output) {
     lineIndex += 1
   ) {
     const line = lines[lineIndex];
+
+    if (
+      /^[ \t]+(?:# Subtest:|(?:not )?ok [0-9]+ - |1\.\.)/
+        .test(line) &&
+      /^ */.exec(line)[0].length !==
+        /^[ \t]*/.exec(line)[0].length
+    ) {
+      structureValid = false;
+      continue;
+    }
+
     const subtestMatch =
-      /^# Subtest: (.+)$/
+      /^( *)# Subtest: (.+)$/
         .exec(line);
 
     if (subtestMatch !== null) {
-      pendingSubtest = {
-        testName:
-          subtestMatch[1].trim(),
-        lineIndex,
-      };
+      const indentation =
+        subtestMatch[1].length;
+
+      validateIndentation(indentation);
+
+      if (
+        pendingSubtests.has(
+          indentation,
+        )
+      ) {
+        structureValid = false;
+      }
+
+      pendingSubtests.set(
+        indentation,
+        {
+          testName:
+            subtestMatch[2].trim(),
+          lineIndex,
+          indentation,
+          hasNestedScope: false,
+          childScope: null,
+        },
+      );
+
+      const scope =
+        scopeAt(indentation);
+
+      if (
+        scope !== null &&
+        scope.plans.length > 0
+      ) {
+        structureValid = false;
+      }
 
       continue;
     }
 
     const resultMatch =
-      /^(not )?ok ([0-9]+) - (.+)$/
+      /^( *)(not )?ok ([0-9]+) - (.+)$/
         .exec(line);
 
-    if (resultMatch === null) {
+    if (resultMatch !== null) {
+      const indentation =
+        resultMatch[1].length;
+
+      validateIndentation(indentation);
+
+      const pendingSubtest =
+        pendingSubtests.get(
+          indentation,
+        ) ?? null;
+
+      const testName =
+        resultMatch[4].trim();
+
+      const declarationMatched =
+        pendingSubtest !== null &&
+        pendingSubtest.testName ===
+          testName;
+
+      const result = {
+        failed:
+          resultMatch[2] === "not ",
+        testNumber:
+          Number(resultMatch[3]),
+        testName,
+        indentation,
+        resultLineIndex: lineIndex,
+        declarationLineIndex:
+          declarationMatched
+            ? pendingSubtest.lineIndex
+            : null,
+        declarationMatched,
+        hasNestedScope:
+          pendingSubtest
+            ?.hasNestedScope === true,
+      };
+
+      results.push(result);
+      const scope =
+        scopeAt(indentation);
+
+      if (scope === null) {
+        structureValid = false;
+      } else {
+        if (scope.plans.length > 0) {
+          structureValid = false;
+        }
+
+        scope.results.push(result);
+      }
+
+      if (!declarationMatched) {
+        structureValid = false;
+      }
+
+      pendingSubtests.delete(
+        indentation,
+      );
+
       continue;
     }
 
-    const testName =
-      resultMatch[3].trim();
+    const planMatch =
+      /^( *)1\.\.([0-9]+)$/
+        .exec(line);
 
-    const declarationMatched =
-      pendingSubtest !== null &&
-      pendingSubtest.testName ===
-        testName;
+    if (planMatch !== null) {
+      const indentation =
+        planMatch[1].length;
 
-    results.push({
-      failed:
-        resultMatch[1] === "not ",
-      testNumber:
-        Number(resultMatch[2]),
-      testName,
-      resultLineIndex: lineIndex,
-      blockStartLineIndex:
-        declarationMatched
-          ? pendingSubtest.lineIndex
-          : lineIndex,
-      declarationMatched,
-    });
+      validateIndentation(indentation);
 
-    pendingSubtest = null;
+      const scope =
+        scopeAt(indentation);
+
+      if (scope === null) {
+        structureValid = false;
+      } else {
+        scope.plans.push({
+          count: Number(planMatch[2]),
+          lineIndex,
+        });
+      }
+
+      if (
+        indentation > 0 &&
+        pendingSubtests.has(
+          indentation,
+        )
+      ) {
+        structureValid = false;
+      }
+    }
   }
 
-  return results.map(
-    (result, index) => {
-      const nextResult =
-        results[index + 1];
+  if (pendingSubtests.size > 0) {
+    structureValid = false;
+  }
 
+  for (const scope of scopes) {
+    const testNumbers = scope.results.map(
+      (result) => result.testNumber,
+    );
+
+    if (
+      new Set(testNumbers).size !==
+      testNumbers.length
+    ) {
+      structureValid = false;
+    }
+
+    if (
+      scope.indentation === 0 &&
+      !nestedTapPresent
+    ) {
+      continue;
+    }
+
+    if (scope.plans.length !== 1) {
+      structureValid = false;
+      continue;
+    }
+
+    const planCount =
+      scope.plans[0].count;
+
+    if (
+      planCount !== scope.results.length ||
+      testNumbers.some(
+        (testNumber, index) =>
+          testNumber !== index + 1,
+      )
+    ) {
+      structureValid = false;
+    }
+  }
+
+  const attachedDiagnosticLines =
+    new Set();
+
+  const resultsWithBlocks = results.map(
+    (result) => {
       let blockEndLineIndex =
-        nextResult === undefined
-          ? lines.length
-          : nextResult
-              .blockStartLineIndex;
+        lines.length;
 
       for (
         let lineIndex =
           result.resultLineIndex + 1;
-        lineIndex <
-          blockEndLineIndex;
+        lineIndex < lines.length;
         lineIndex += 1
       ) {
+        const structuralMatch =
+          /^( *)(?:# Subtest:|(?:not )?ok [0-9]+ - |1\.\.)/
+            .exec(lines[lineIndex]);
+
         if (
-          /^1\.\.[0-9]+$/
-            .test(lines[lineIndex]) ||
+          structuralMatch !== null &&
+          structuralMatch[1].length <=
+            result.indentation
+        ) {
+          blockEndLineIndex =
+            lineIndex;
+          break;
+        }
+
+        if (
+          result.indentation === 0 &&
           /^# tests [0-9]+$/
             .test(lines[lineIndex])
         ) {
@@ -350,17 +570,118 @@ function parseTopLevelTestResults(output) {
         }
       }
 
+      const diagnosticLines = lines.slice(
+        result.resultLineIndex + 1,
+        blockEndLineIndex,
+      );
+
+      for (
+        let lineIndex =
+          result.resultLineIndex + 1;
+        lineIndex < blockEndLineIndex;
+        lineIndex += 1
+      ) {
+        attachedDiagnosticLines.add(
+          lineIndex,
+        );
+      }
+
+      const markerIndexes = [];
+
+      for (
+        let index = 0;
+        index < diagnosticLines.length;
+        index += 1
+      ) {
+        const markerMatch =
+          /^( *)(---|\.\.\.)$/
+            .exec(diagnosticLines[index]);
+
+        if (markerMatch !== null) {
+          markerIndexes.push({
+            indentation:
+              markerMatch[1].length,
+            marker: markerMatch[2],
+            index,
+          });
+        }
+      }
+
+      if (
+        nestedTapPresent &&
+        markerIndexes.length !== 0 &&
+        (
+          markerIndexes.length !== 2 ||
+          markerIndexes[0].marker !==
+            "---" ||
+          markerIndexes[1].marker !==
+            "..." ||
+          markerIndexes[0].indentation !==
+            result.indentation + 2 ||
+          markerIndexes[1].indentation !==
+            result.indentation + 2
+        )
+      ) {
+        structureValid = false;
+      }
+
+      const blockLines = [
+        ...(result.declarationLineIndex ===
+        null
+          ? []
+          : [
+              lines[
+                result
+                  .declarationLineIndex
+              ],
+            ]),
+        ...lines.slice(
+          result.resultLineIndex,
+          blockEndLineIndex,
+        ),
+      ];
+
       return {
         ...result,
-        block: lines
-          .slice(
-            result.blockStartLineIndex,
-            blockEndLineIndex,
+        block: blockLines
+          .map((line) =>
+            line.startsWith(
+              " ".repeat(
+                result.indentation,
+              ),
+            )
+              ? line.slice(
+                  result.indentation,
+                )
+              : line,
           )
           .join("\n"),
       };
     },
   );
+
+  for (
+    let lineIndex = 0;
+    lineIndex < lines.length;
+    lineIndex += 1
+  ) {
+    if (
+      nestedTapPresent &&
+      /^(?: *)(?:---|\.\.\.)$/
+        .test(lines[lineIndex]) &&
+      !attachedDiagnosticLines.has(
+        lineIndex,
+      )
+    ) {
+      structureValid = false;
+    }
+  }
+
+  return {
+    results: resultsWithBlocks,
+    nestedTapPresent,
+    structureValid,
+  };
 }
 
 function createClassification({
@@ -421,8 +742,11 @@ function collectNodeTestEvidence(
   const summary =
     parseSummary(output);
 
+  const parsedTestResults =
+    parseNodeTestResults(output);
+
   const testResults =
-    parseTopLevelTestResults(output);
+    parsedTestResults.results;
 
   const topLevelSubtestCount =
     (
@@ -431,26 +755,47 @@ function collectNodeTestEvidence(
       ) ?? []
     ).length;
 
+  const topLevelTestResults =
+    testResults.filter(
+      (result) =>
+        result.indentation === 0,
+    );
+
   const uniqueTestNumbers =
     new Set(
-      testResults.map(
+      topLevelTestResults.map(
         (result) =>
           result.testNumber,
       ),
     );
 
   const tapResultStructureValid =
+    parsedTestResults.structureValid &&
     topLevelSubtestCount ===
-      testResults.length &&
+      topLevelTestResults.length &&
     uniqueTestNumbers.size ===
-      testResults.length &&
+      topLevelTestResults.length &&
     testResults.every(
       (result) =>
         result.declarationMatched,
     );
 
-  const failedTestResults =
+  const leafTestResults =
     testResults.filter(
+      (result) =>
+        !result.hasNestedScope &&
+        singleDiagnosticValue(
+          result.block,
+          "type",
+        ) !== "suite" &&
+        singleDiagnosticValue(
+          result.block,
+          "failureType",
+        ) !== "subtestsFailed",
+    );
+
+  const failedTestResults =
+    leafTestResults.filter(
       (result) => result.failed,
     );
 
@@ -497,7 +842,24 @@ function collectNodeTestEvidence(
     summary,
     failedSubtests,
     failedTestResults,
-    tapResultStructureValid,
+    nestedTapPresent:
+      parsedTestResults
+        .nestedTapPresent,
+    tapResultStructureValid:
+      tapResultStructureValid &&
+      (
+        !parsedTestResults
+          .nestedTapPresent ||
+        (
+          summary.tests ===
+            leafTestResults.length &&
+          summary.fail ===
+            failedTestResults.length &&
+          summary.pass ===
+            leafTestResults.length -
+              failedTestResults.length
+        )
+      ),
     assertionObserved,
     loadFailureObserved,
     hasCompleteSummary,
@@ -731,7 +1093,11 @@ export function classifyNodeTestExecution(
     evidence.summary.skipped === 0 &&
     evidence.summary.todo === 0 &&
     evidence.failedSubtests.length === 0 &&
-    !evidence.assertionObserved;
+    !evidence.assertionObserved &&
+    (
+      !evidence.nestedTapPresent ||
+      evidence.tapResultStructureValid
+    );
 
   if (passingOutcome) {
     return createClassification({

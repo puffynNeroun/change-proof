@@ -137,6 +137,94 @@ function failureSetTap({
   return lines.join("\n");
 }
 
+function nestedSuiteLines({
+  suiteName,
+  suiteNumber,
+  leaves,
+}) {
+  const lines = [
+    `# Subtest: ${suiteName}`,
+  ];
+
+  for (
+    let index = 0;
+    index < leaves.length;
+    index += 1
+  ) {
+    const leaf = leaves[index];
+    const failed = leaf.failed === true;
+
+    lines.push(
+      `    # Subtest: ${leaf.testName}`,
+      `    ${failed ? "not " : ""}ok ${index + 1} - ${leaf.testName}`,
+      "      ---",
+      "      duration_ms: 1",
+      "      type: 'test'",
+      ...(failed
+        ? [
+            "      failureType: 'testCodeFailure'",
+            `      error: '${leaf.error ?? "expected failure"}'`,
+            ...(leaf.diagnosticLines ?? []),
+            `      code: '${leaf.code ?? "ERR_ASSERTION"}'`,
+            ...(leaf.extraLines ?? []),
+          ]
+        : []),
+      "      ...",
+    );
+  }
+
+  const failedLeaves = leaves.filter(
+    (leaf) => leaf.failed === true,
+  );
+
+  lines.push(
+    `    1..${leaves.length}`,
+    `${failedLeaves.length > 0 ? "not " : ""}ok ${suiteNumber} - ${suiteName}`,
+    "  ---",
+    "  duration_ms: 1",
+    "  type: 'suite'",
+    ...(failedLeaves.length > 0
+      ? [
+          "  failureType: 'subtestsFailed'",
+          `  error: '${failedLeaves.length} subtests failed'`,
+          "  code: 'ERR_TEST_FAILURE'",
+        ]
+      : []),
+    "  ...",
+  );
+
+  return lines;
+}
+
+function nestedSuitesTap(suites) {
+  const leaves = suites.flatMap(
+    (suite) => suite.leaves,
+  );
+  const failedLeaves = leaves.filter(
+    (leaf) => leaf.failed === true,
+  );
+
+  return [
+    "TAP version 13",
+    ...suites.flatMap(
+      (suite, index) =>
+        nestedSuiteLines({
+          ...suite,
+          suiteNumber: index + 1,
+        }),
+    ),
+    `1..${suites.length}`,
+    `# tests ${leaves.length}`,
+    `# suites ${suites.length}`,
+    `# pass ${leaves.length - failedLeaves.length}`,
+    `# fail ${failedLeaves.length}`,
+    "# cancelled 0",
+    "# skipped 0",
+    "# todo 0",
+    "",
+  ].join("\n");
+}
+
 function specificationFor(
   failure,
 ) {
@@ -2131,6 +2219,792 @@ test(
         expected,
       );
     }
+  },
+);
+
+test(
+  "classifies exact failing leaves in one nested suite and excludes its aggregate",
+  () => {
+    const leaves = [
+      {
+        testName: "passing leaf",
+      },
+      {
+        testName: "first failing leaf",
+        failed: true,
+        error: "first mismatch",
+        diagnosticLines: [
+          "        first leaf output",
+        ],
+      },
+      {
+        testName: "second failing leaf",
+        failed: true,
+        code: "ERR_TEST_FAILURE",
+        error: "second expected failure",
+        diagnosticLines: [
+          "        second leaf output",
+        ],
+      },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: nestedSuitesTap([
+              {
+                suiteName: "parent suite",
+                leaves,
+              },
+            ]),
+          }),
+        expectedTestCount: 3,
+        expectedFailures: [
+          {
+            testName: "first failing leaf",
+            outputIncludes: [
+              "first leaf output",
+              "code: 'ERR_ASSERTION'",
+            ],
+          },
+          {
+            testName: "second failing leaf",
+            outputIncludes: [
+              "second leaf output",
+              "code: 'ERR_TEST_FAILURE'",
+            ],
+          },
+        ],
+      });
+
+    assert.deepEqual(result, {
+      framework: "node:test",
+      outcome:
+        NODE_TEST_OUTCOMES
+          .EXPECTED_TEST_FAILURE,
+      reasonCode:
+        NODE_TEST_REASON_CODES
+          .EXPECTED_TEST_FAILURE_SET_OBSERVED,
+      testDiscovered: true,
+      testExecuted: true,
+      assertionObserved: true,
+      invalidFailure: false,
+      tapVersionPresent: true,
+      summary: {
+        tests: 3,
+        pass: 1,
+        fail: 2,
+        cancelled: 0,
+        skipped: 0,
+        todo: 0,
+      },
+      failedSubtests: [
+        "first failing leaf",
+        "second failing leaf",
+      ],
+    });
+  },
+);
+
+test(
+  "classifies the exact four project-forge CLI leaves",
+  () => {
+    const leaves = [
+      {
+        testName:
+          "prints version with --version",
+        failed: true,
+        error: "long version mismatch",
+      },
+      {
+        testName:
+          "prints version with -V",
+        failed: true,
+        error: "short version mismatch",
+      },
+      {
+        testName:
+          "rejects --version with an extra argument",
+        failed: true,
+        code: "ERR_TEST_FAILURE",
+        error: "extra argument was accepted",
+      },
+      {
+        testName:
+          "rejects --version on the new command",
+        failed: true,
+        error: "new command accepted version",
+      },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: nestedSuitesTap([
+              {
+                suiteName:
+                  "project-forge CLI",
+                leaves,
+              },
+            ]),
+          }),
+        expectedTestCount: 4,
+        expectedFailures:
+          leaves.map(
+            specificationFor,
+          ),
+      });
+
+    assert.deepEqual(result, {
+      framework: "node:test",
+      outcome:
+        NODE_TEST_OUTCOMES
+          .EXPECTED_TEST_FAILURE,
+      reasonCode:
+        NODE_TEST_REASON_CODES
+          .EXPECTED_TEST_FAILURE_SET_OBSERVED,
+      testDiscovered: true,
+      testExecuted: true,
+      assertionObserved: true,
+      invalidFailure: false,
+      tapVersionPresent: true,
+      summary: {
+        tests: 4,
+        pass: 0,
+        fail: 4,
+        cancelled: 0,
+        skipped: 0,
+        todo: 0,
+      },
+      failedSubtests: leaves.map(
+        (leaf) => leaf.testName,
+      ),
+    });
+  },
+);
+
+test(
+  "rejects an aggregate nested suite configured as the expected failure",
+  () => {
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: nestedSuitesTap([
+              {
+                suiteName: "parent suite",
+                leaves: [
+                  {
+                    testName: "actual leaf",
+                    failed: true,
+                  },
+                ],
+              },
+            ]),
+          }),
+        expectedTestCount: 1,
+        expectedFailures: [
+          {
+            testName: "parent suite",
+            outputIncludes: [
+              "subtestsFailed",
+            ],
+          },
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+    assert.equal(
+      result.reasonCode,
+      NODE_TEST_REASON_CODES
+        .EXPECTED_ASSERTION_FAILURE_NOT_OBSERVED,
+    );
+    assert.deepEqual(
+      result.failedSubtests,
+      ["actual leaf"],
+    );
+  },
+);
+
+test(
+  "rejects missing and additional nested failing leaves",
+  () => {
+    const leaves = [
+      {
+        testName: "expected leaf",
+        failed: true,
+      },
+      {
+        testName: "additional leaf",
+        failed: true,
+      },
+    ];
+    const common = {
+      executionResult:
+        execution({
+          exitCode: 1,
+          stdout: nestedSuitesTap([
+            {
+              suiteName: "parent suite",
+              leaves,
+            },
+          ]),
+        }),
+      expectedTestCount: 2,
+    };
+
+    const cases = [
+      [specificationFor(leaves[0])],
+      [
+        specificationFor(leaves[0]),
+        specificationFor({
+          testName: "missing leaf",
+        }),
+      ],
+    ];
+
+    for (const expectedFailures of cases) {
+      const result =
+        classifyExpectedNodeTestRegression({
+          ...common,
+          expectedFailures,
+        });
+
+      assert.equal(
+        result.outcome,
+        NODE_TEST_OUTCOMES.INCONCLUSIVE,
+      );
+      assert.equal(
+        result.reasonCode,
+        NODE_TEST_REASON_CODES
+          .EXPECTED_ASSERTION_FAILURE_NOT_OBSERVED,
+      );
+    }
+  },
+);
+
+test(
+  "does not match a nested leaf fragment from its sibling",
+  () => {
+    const leaves = [
+      {
+        testName: "first leaf",
+        failed: true,
+        diagnosticLines: [
+          "        fragment-for-second",
+        ],
+      },
+      {
+        testName: "second leaf",
+        failed: true,
+        diagnosticLines: [
+          "        fragment-for-first",
+        ],
+      },
+    ];
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout: nestedSuitesTap([
+              {
+                suiteName: "parent suite",
+                leaves,
+              },
+            ]),
+          }),
+        expectedTestCount: 2,
+        expectedFailures: [
+          {
+            testName: "first leaf",
+            outputIncludes: [
+              "fragment-for-first",
+            ],
+          },
+          {
+            testName: "second leaf",
+            outputIncludes: [
+              "fragment-for-second",
+            ],
+          },
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+  },
+);
+
+test(
+  "preserves deterministic failed-leaf order across two nested suites",
+  () => {
+    const suites = [
+      {
+        suiteName: "first suite",
+        leaves: [
+          {
+            testName: "first suite leaf",
+            failed: true,
+          },
+        ],
+      },
+      {
+        suiteName: "second suite",
+        leaves: [
+          {
+            testName: "passing sibling",
+          },
+          {
+            testName: "second suite leaf",
+            failed: true,
+          },
+        ],
+      },
+    ];
+    const failures = suites.flatMap(
+      (suite) =>
+        suite.leaves.filter(
+          (leaf) => leaf.failed === true,
+        ),
+    );
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout:
+              nestedSuitesTap(suites),
+          }),
+        expectedTestCount: 3,
+        expectedFailures:
+          failures.map(
+            specificationFor,
+          ),
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES
+        .TEST_ASSERTION_FAILURE,
+    );
+    assert.deepEqual(
+      result.failedSubtests,
+      [
+        "first suite leaf",
+        "second suite leaf",
+      ],
+    );
+  },
+);
+
+test(
+  "classifies only the terminal failure in a deeper nested suite",
+  () => {
+    const stdout = [
+      "TAP version 13",
+      "# Subtest: outer suite",
+      "    # Subtest: inner suite",
+      "        # Subtest: deep failing leaf",
+      "        not ok 1 - deep failing leaf",
+      "          ---",
+      "          type: 'test'",
+      "          failureType: 'testCodeFailure'",
+      "          error: 'deep mismatch'",
+      "          code: 'ERR_ASSERTION'",
+      "          ...",
+      "        1..1",
+      "    not ok 1 - inner suite",
+      "      ---",
+      "      type: 'suite'",
+      "      failureType: 'subtestsFailed'",
+      "      error: '1 subtest failed'",
+      "      code: 'ERR_TEST_FAILURE'",
+      "      ...",
+      "    1..1",
+      "not ok 1 - outer suite",
+      "  ---",
+      "  type: 'suite'",
+      "  failureType: 'subtestsFailed'",
+      "  error: '1 subtest failed'",
+      "  code: 'ERR_TEST_FAILURE'",
+      "  ...",
+      "1..1",
+      "# tests 1",
+      "# suites 2",
+      "# pass 0",
+      "# fail 1",
+      "# cancelled 0",
+      "# skipped 0",
+      "# todo 0",
+      "",
+    ].join("\n");
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout,
+          }),
+        expectedTestCount: 1,
+        expectedFailures: [
+          {
+            testName:
+              "deep failing leaf",
+            outputIncludes: [
+              "deep mismatch",
+            ],
+          },
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES
+        .TEST_ASSERTION_FAILURE,
+    );
+    assert.deepEqual(
+      result.failedSubtests,
+      ["deep failing leaf"],
+    );
+  },
+);
+
+test(
+  "rejects duplicate identities and nested hook or runner failures",
+  () => {
+    const duplicateTap = nestedSuitesTap([
+      {
+        suiteName: "parent suite",
+        leaves: [
+          {
+            testName: "duplicate leaf",
+            failed: true,
+          },
+          {
+            testName: "duplicate leaf",
+            failed: true,
+          },
+        ],
+      },
+    ]);
+    const hookTap = nestedSuitesTap([
+      {
+        suiteName: "parent suite",
+        leaves: [
+          {
+            testName: "hooked leaf",
+            failed: true,
+            code: "ERR_TEST_FAILURE",
+            error: "beforeEach hook failed",
+          },
+        ],
+      },
+    ]).replace(
+      "failureType: 'testCodeFailure'",
+      "failureType: 'hookFailed'",
+    );
+    const runnerTap = nestedSuitesTap([
+      {
+        suiteName: "parent suite",
+        leaves: [
+          {
+            testName: "test/example.test.mjs",
+            failed: true,
+            code: "ERR_TEST_FAILURE",
+            error: "test failed",
+            extraLines: [
+              "      exitCode: 1",
+              "      signal: ~",
+            ],
+          },
+        ],
+      },
+    ]);
+    const cases = [
+      {
+        stdout: duplicateTap,
+        expectedTestCount: 2,
+        expectedFailures: [
+          specificationFor({
+            testName: "duplicate leaf",
+          }),
+          specificationFor({
+            testName: "other leaf",
+          }),
+        ],
+      },
+      {
+        stdout: hookTap,
+        expectedTestCount: 1,
+        expectedFailures: [
+          {
+            testName: "hooked leaf",
+            outputIncludes: [
+              "beforeEach hook failed",
+            ],
+          },
+        ],
+      },
+      {
+        stdout: runnerTap,
+        expectedTestCount: 1,
+        expectedFailures: [
+          {
+            testName:
+              "test/example.test.mjs",
+            outputIncludes: [
+              "error: 'test failed'",
+            ],
+          },
+        ],
+      },
+    ];
+
+    for (const scenario of cases) {
+      const result =
+        classifyExpectedNodeTestRegression({
+          executionResult:
+            execution({
+              exitCode: 1,
+              stdout: scenario.stdout,
+            }),
+          expectedTestCount:
+            scenario.expectedTestCount,
+          expectedFailures:
+            scenario.expectedFailures,
+        });
+
+      assert.equal(
+        result.outcome,
+        NODE_TEST_OUTCOMES.INCONCLUSIVE,
+      );
+    }
+  },
+);
+
+test(
+  "does not treat an aggregate-only nested failure as behavioral evidence",
+  () => {
+    const stdout = nestedSuitesTap([
+      {
+        suiteName: "parent suite",
+        leaves: [
+          {
+            testName: "passing leaf",
+          },
+        ],
+      },
+    ])
+      .replace(
+        "ok 1 - parent suite",
+        "not ok 1 - parent suite",
+      )
+      .replace(
+        "  ...\n1..1",
+        [
+          "  failureType: 'subtestsFailed'",
+          "  error: '1 subtest failed'",
+          "  code: 'ERR_TEST_FAILURE'",
+          "  ...",
+          "1..1",
+        ].join("\n"),
+      )
+      .replace("# pass 1", "# pass 0")
+      .replace("# fail 0", "# fail 1");
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout,
+          }),
+        expectedTestCount: 1,
+        expectedFailures: [
+          {
+            testName: "passing leaf",
+            outputIncludes: [
+              "ERR_ASSERTION",
+            ],
+          },
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+    assert.deepEqual(result.failedSubtests, []);
+  },
+);
+
+test(
+  "fails closed for malformed nested indentation, plans, numbering, and diagnostics",
+  () => {
+    const leaves = [
+      {
+        testName: "passing leaf",
+      },
+      {
+        testName: "first failing leaf",
+        failed: true,
+      },
+      {
+        testName: "second failing leaf",
+        failed: true,
+      },
+    ];
+    const validTap = nestedSuitesTap([
+      {
+        suiteName: "parent suite",
+        leaves,
+      },
+    ]);
+    const expectedFailures = leaves
+      .filter((leaf) => leaf.failed)
+      .map(specificationFor);
+    const malformedTaps = [
+      validTap.replace(
+        "    # Subtest: first failing leaf",
+        "  # Subtest: first failing leaf",
+      ),
+      validTap.replace(
+        "not ok 3 - second failing leaf",
+        "not ok 2 - second failing leaf",
+      ),
+      validTap.replace("    1..3\n", ""),
+      validTap.replace(
+        "    1..3",
+        "    1..3\n    1..3",
+      ),
+      validTap.replace("    1..3", "    1..2"),
+      validTap.replace(
+        "# Subtest: parent suite",
+        "  ---\n  ...\n# Subtest: parent suite",
+      ),
+    ];
+
+    for (const stdout of malformedTaps) {
+      const result =
+        classifyExpectedNodeTestRegression({
+          executionResult:
+            execution({
+              exitCode: 1,
+              stdout,
+            }),
+          expectedTestCount: 3,
+          expectedFailures,
+        });
+
+      assert.equal(
+        result.outcome,
+        NODE_TEST_OUTCOMES.INCONCLUSIVE,
+      );
+      assert.equal(
+        result.reasonCode,
+        NODE_TEST_REASON_CODES
+          .EXPECTED_ASSERTION_FAILURE_NOT_OBSERVED,
+      );
+    }
+  },
+);
+
+test(
+  "keeps nested classification immutable and deterministic",
+  () => {
+    const leaf = {
+      testName: "nested failure",
+      failed: true,
+    };
+    const executionResult = Object.freeze(
+      execution({
+        exitCode: 1,
+        stdout: nestedSuitesTap([
+          {
+            suiteName: "parent suite",
+            leaves: [leaf],
+          },
+        ]),
+      }),
+    );
+    const expectedFailures = Object.freeze([
+      Object.freeze({
+        testName: leaf.testName,
+        outputIncludes: Object.freeze([
+          "code: 'ERR_ASSERTION'",
+        ]),
+      }),
+    ]);
+    const input = Object.freeze({
+      executionResult,
+      expectedTestCount: 1,
+      expectedFailures,
+    });
+    const before = JSON.stringify(input);
+    const expected =
+      classifyExpectedNodeTestRegression(
+        input,
+      );
+
+    for (
+      let index = 0;
+      index < 100;
+      index += 1
+    ) {
+      assert.deepEqual(
+        classifyExpectedNodeTestRegression(
+          input,
+        ),
+        expected,
+      );
+    }
+
+    assert.equal(JSON.stringify(input), before);
+  },
+);
+
+test(
+  "does not classify malformed passing nested TAP as PASS",
+  () => {
+    const stdout = nestedSuitesTap([
+      {
+        suiteName: "parent suite",
+        leaves: [
+          {
+            testName: "passing leaf",
+          },
+        ],
+      },
+    ]).replace("    1..1\n", "");
+
+    const result = classifyNodeTestExecution({
+      executionResult: execution({ stdout }),
+      expectedTestCount: 1,
+    });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+    assert.equal(
+      result.reasonCode,
+      NODE_TEST_REASON_CODES
+        .UNSUPPORTED_TAP_RESULT,
+    );
   },
 );
 
