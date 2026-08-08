@@ -103,8 +103,20 @@ test(
       );
 
       assert.equal(
+        packageJson.name,
+        "@changeproof/cli",
+      );
+
+      assert.equal(
         packageJson.private,
         true,
+      );
+
+      assert.deepEqual(
+        packageJson.publishConfig,
+        {
+          access: "public",
+        },
       );
 
       assert.equal(

@@ -135,6 +135,16 @@ M3 wraps that engine in the minimum local public CLI beta. It does not replace o
 
 M4.2 repeats the local beta evidence observation on project-forge's nested `node:test` CLI suite, providing a second external validation without making a release-readiness claim.
 
+## Distribution identity
+
+The canonical npm package identity for the planned public beta is `@changeproof/cli`. The installed executable remains `change-proof`.
+
+The package has not been published to npm yet. The manifest intentionally keeps `"private": true` while release preparation continues. `publishConfig.access` is set to `"public"` for the eventual scoped public release.
+
+After publication, install it with `npm install -g @changeproof/cli` and invoke it as `change-proof`.
+
+Until publication, use the repository-checkout workflow documented above.
+
 ## License
 
 Change Proof is licensed under the Apache License 2.0. See [`LICENSE`](LICENSE).
