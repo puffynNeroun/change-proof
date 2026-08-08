@@ -37,6 +37,7 @@
     "test": "node --test --test-reporter=tap test/core/*.test.mjs test/cli/*.test.mjs test/integration/*.test.mjs",
     "test:core": "node --test --test-reporter=tap test/core/*.test.mjs",
     "test:cli": "node --test --test-reporter=tap test/cli/*.test.mjs",
-    "test:integration": "node --test --test-reporter=tap test/integration/*.test.mjs"
+    "test:integration": "node --test --test-reporter=tap test/integration/*.test.mjs",
+    "test:consumer": "node --test --test-reporter=tap test/integration/m5-package-consumer.test.mjs"
   }
 }
