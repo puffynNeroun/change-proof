@@ -137,4 +137,4 @@ M4.2 repeats the local beta evidence observation on project-forge's nested `node
 
 ## License
 
-No public license has been selected. The tracked `LICENSE` file does not establish an SPDX license, so the M3 package manifest intentionally omits a `license` field. Until a license is selected, this repository should be treated as unpublished research material with no granted redistribution rights.
+Change Proof is licensed under the Apache License 2.0. See [`LICENSE`](LICENSE).

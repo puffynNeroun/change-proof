@@ -1,6 +1,23 @@
 {
   "name": "change-proof",
   "version": "0.1.0-beta.1",
+  "description": "Reproducible evidence that changed tests distinguish base and head behavior.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/puffynNeroun/change-proof.git"
+  },
+  "homepage": "https://github.com/puffynNeroun/change-proof#readme",
+  "bugs": {
+    "url": "https://github.com/puffynNeroun/change-proof/issues"
+  },
+  "keywords": [
+    "testing",
+    "regression-testing",
+    "developer-tools",
+    "cli",
+    "git"
+  ],
   "type": "module",
   "private": true,
   "bin": {
