@@ -101,6 +101,8 @@ Git worktrees isolate repository states. They are not a security sandbox. Change
 
 The tool itself performs no remote fetch and requires no network access. It does not install dependencies. Configured repository code remains responsible for its own behavior, including any network or external-service use.
 
+Security vulnerabilities should be reported according to [`SECURITY.md`](SECURITY.md). Do not publish vulnerability details in a public issue or pull request.
+
 ## Evidence model and limitations
 
 - **State A:** exact base commit with base tests.
