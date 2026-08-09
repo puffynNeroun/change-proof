@@ -2,9 +2,9 @@
 
 ## Status
 
-These constraints apply to the controlled M1 experiment and the proposed local MVP.
+This document records the intentionally restrictive baseline established for the controlled M1 experiment. Some M1 constraints have since been superseded by the implemented v0.1 beta.
 
-They are intentionally restrictive.
+Treat the sections below as historical M1 constraints. Current public scope and limitations are defined by `V0_1_PRODUCT_SCOPE.md`, `M3_PUBLIC_CLI_CONTRACT.md`, and the repository README.
 
 ## Initial supported scope
 
