@@ -121,6 +121,7 @@ M3 provides no automatic test, envelope, dependency, environment, or command dis
 - [`src/cli`](src/cli) — strict config loading, report transaction, and command runner.
 - [`src/core`](src/core) — production three-state evidence engine.
 - [`change-proof.config.example.json`](change-proof.config.example.json) — editable strict configuration example.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) - development, validation, and pull-request expectations.
 - [`docs/M3_PUBLIC_CLI_CONTRACT.md`](docs/M3_PUBLIC_CLI_CONTRACT.md) — M3 beta CLI contract.
 - [`docs/M4_SECOND_EXTERNAL_VALIDATION.md`](docs/M4_SECOND_EXTERNAL_VALIDATION.md) — second external public-CLI validation.
 - [`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md) — evidence model.
