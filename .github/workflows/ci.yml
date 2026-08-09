@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Node 24 validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Setup Node.js 24
+        # Temporary exact pin to the merged upstream security fix for
+        # GHSA-3jxr-9vmj-r5cp until setup-node publishes a patched release.
+        uses: actions/setup-node@e51e5fe84fc33b4c73ebe40526b2694712b5b858
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Runtime versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          git --version
+
+      - name: Full regression suite
+        run: npm test
+
+      - name: Validate npm package projection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          npm pack --dry-run --ignore-scripts --json > "$tmp_dir/pack.json"
+
+          node - "$tmp_dir/pack.json" <<'NODE'
+          const fs = require("node:fs");
+
+          const data = JSON.parse(
+            fs.readFileSync(process.argv[2], "utf8"),
+          );
+
+          if (!Array.isArray(data) || data.length !== 1) {
+            throw new Error("expected exactly one npm pack result");
+          }
+
+          const pack = data[0];
+
+          if (pack.name !== "@changeproof/cli") {
+            throw new Error(
+              `unexpected package name: ${pack.name}`,
+            );
+          }
+
+          if (pack.version !== "0.1.0-beta.1") {
+            throw new Error(
+              `unexpected package version: ${pack.version}`,
+            );
+          }
+
+          if (pack.entryCount !== 18) {
+            throw new Error(
+              `unexpected package entry count: ${pack.entryCount}`,
+            );
+          }
+
+          if (
+            !Array.isArray(pack.bundled) ||
+            pack.bundled.length !== 0
+          ) {
+            throw new Error(
+              "unexpected bundled dependencies",
+            );
+          }
+
+          const paths = pack.files.map(
+            (entry) => entry.path,
+          );
+
+          if (
+            paths.some(
+              (path) =>
+                path.startsWith("test/") ||
+                path.startsWith("docs/") ||
+                path.startsWith(".github/"),
+            )
+          ) {
+            throw new Error(
+              "non-distribution files leaked into package",
+            );
+          }
+
+          console.log(`package=${pack.name}@${pack.version}`);
+          console.log(`entries=${pack.entryCount}`);
+          console.log("package_projection=PASS");
+          NODE
+
+      - name: Verify checkout remained clean
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "$(git status --porcelain=v1)" ]; then
+            git status --short
+            echo "CI validation dirtied the checkout" >&2
+            exit 1
+          fi
+
+          if find . -maxdepth 1 -type f -name '*.tgz' -print -quit | grep -q .; then
+            find . -maxdepth 1 -type f -name '*.tgz' -print
+            echo "npm tarball artifact leaked into the checkout" >&2
+            exit 1
+          fi
