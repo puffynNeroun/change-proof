@@ -1,0 +1,244 @@
+name: Release preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: Expected unpublished package version
+        required: true
+        default: 0.1.0-beta.1
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-preflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Bootstrap release preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node.js 24
+        # Temporary exact pin to the merged upstream security fix for
+        # GHSA-3jxr-9vmj-r5cp until setup-node publishes a patched release.
+        uses: actions/setup-node@e51e5fe84fc33b4c73ebe40526b2694712b5b858
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Require main branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Release preflight must run from main" >&2
+            exit 1
+          fi
+
+      - name: Runtime versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          git --version
+
+      - name: Validate bootstrap manifest
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const pkg = JSON.parse(
+            fs.readFileSync("package.json", "utf8"),
+          );
+
+          const expectedVersion = process.env.EXPECTED_VERSION;
+
+          if (pkg.name !== "@changeproof/cli") {
+            throw new Error(`unexpected package name: ${pkg.name}`);
+          }
+
+          if (pkg.version !== expectedVersion) {
+            throw new Error(
+              `version mismatch: expected ${expectedVersion}, got ${pkg.version}`,
+            );
+          }
+
+          if (pkg.private !== true) {
+            throw new Error(
+              "bootstrap publication safety lock must remain active",
+            );
+          }
+
+          if (pkg.publishConfig?.access !== "public") {
+            throw new Error("public scoped-package access contract missing");
+          }
+
+          if (pkg.engines?.node !== ">=24") {
+            throw new Error("unexpected Node.js engine contract");
+          }
+
+          if (pkg.bin?.["change-proof"] !== "bin/change-proof.mjs") {
+            throw new Error("unexpected CLI binary contract");
+          }
+
+          if (
+            pkg.repository?.url !==
+            "git+https://github.com/puffynNeroun/change-proof.git"
+          ) {
+            throw new Error("canonical repository metadata mismatch");
+          }
+
+          if (Object.keys(pkg.dependencies ?? {}).length !== 0) {
+            throw new Error("unexpected runtime dependencies");
+          }
+
+          if (Object.keys(pkg.devDependencies ?? {}).length !== 0) {
+            throw new Error("unexpected development dependencies");
+          }
+
+          console.log("bootstrap_manifest=PASS");
+          NODE
+
+      - name: Require package to remain unpublished
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          if npm view @changeproof/cli version --json             >"$tmp_dir/out" 2>"$tmp_dir/err"
+          then
+            echo "@changeproof/cli already exists; bootstrap preflight is obsolete" >&2
+            cat "$tmp_dir/out"
+            exit 1
+          fi
+
+          if grep -q 'E404' "$tmp_dir/out" ||
+             grep -q 'E404' "$tmp_dir/err"
+          then
+            echo "registry_package_state=UNPUBLISHED"
+          else
+            cat "$tmp_dir/out" >&2 || true
+            cat "$tmp_dir/err" >&2 || true
+            echo "Unexpected npm registry failure" >&2
+            exit 1
+          fi
+
+      - name: Require release tag to remain absent
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="v$EXPECTED_VERSION"
+
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "Release tag already exists: $tag" >&2
+            exit 1
+          fi
+
+          echo "release_tag_state=ABSENT"
+
+      - name: Full regression suite
+        run: npm test
+
+      - name: Validate package projection
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          npm pack --dry-run --ignore-scripts --json > "$tmp_dir/pack.json"
+
+          node - "$tmp_dir/pack.json" <<'NODE'
+          const fs = require("node:fs");
+
+          const data = JSON.parse(
+            fs.readFileSync(process.argv[2], "utf8"),
+          );
+
+          if (!Array.isArray(data) || data.length !== 1) {
+            throw new Error("expected exactly one pack result");
+          }
+
+          const pack = data[0];
+
+          if (pack.name !== "@changeproof/cli") {
+            throw new Error(`unexpected package: ${pack.name}`);
+          }
+
+          if (pack.version !== process.env.EXPECTED_VERSION) {
+            throw new Error(`unexpected version: ${pack.version}`);
+          }
+
+          if (pack.entryCount !== 18) {
+            throw new Error(
+              `unexpected package inventory: ${pack.entryCount}`,
+            );
+          }
+
+          if (
+            !Array.isArray(pack.bundled) ||
+            pack.bundled.length !== 0
+          ) {
+            throw new Error("unexpected bundled dependencies");
+          }
+
+          const paths = pack.files.map((entry) => entry.path);
+
+          if (
+            paths.some(
+              (path) =>
+                path.startsWith("test/") ||
+                path.startsWith("docs/") ||
+                path.startsWith(".github/"),
+            )
+          ) {
+            throw new Error("non-distribution files leaked into package");
+          }
+
+          console.log(`package=${pack.name}@${pack.version}`);
+          console.log(`entries=${pack.entryCount}`);
+          console.log("package_projection=PASS");
+          NODE
+
+      - name: Verify checkout remained clean
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "$(git status --porcelain=v1)" ]; then
+            git status --short
+            echo "Release preflight dirtied the checkout" >&2
+            exit 1
+          fi
+
+          if find . -maxdepth 1 -type f -name '*.tgz' -print -quit |
+             grep -q .
+          then
+            echo "Tarball artifact leaked into checkout" >&2
+            exit 1
+          fi
+
+          echo "release_preflight=PASS"

@@ -124,6 +124,7 @@ M3 provides no automatic test, envelope, dependency, environment, or command dis
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) - development, validation, and pull-request expectations.
 - [`docs/M3_PUBLIC_CLI_CONTRACT.md`](docs/M3_PUBLIC_CLI_CONTRACT.md) — M3 beta CLI contract.
 - [`docs/M4_SECOND_EXTERNAL_VALIDATION.md`](docs/M4_SECOND_EXTERNAL_VALIDATION.md) — second external public-CLI validation.
+- [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) - release bootstrap, trusted-publishing, and publication gates.
 - [`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md) — evidence model.
 - [`docs/MVP_LIMITATIONS.md`](docs/MVP_LIMITATIONS.md) — research limitations.
 - [`experiments/m1-controlled-fixture`](experiments/m1-controlled-fixture) — deterministic M1 historical experiment.
