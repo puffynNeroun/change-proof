@@ -33,7 +33,7 @@ The exact repository, commit, state, dependency-projection, determinism, cleanup
 
 ## Installation status
 
-Change Proof is not published to npm. There are intentionally no npm installation instructions for M3, and the package manifest remains private.
+Change Proof is not published to npm. The canonical planned package is `@changeproof/cli`, the installed executable remains `change-proof`, and the manifest remains `private: true` until the publication stage. Use the local checkout for now; the planned public installation contract is documented below.
 
 Run the local checkout with Node.js 24 or newer:
 

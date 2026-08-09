@@ -2,9 +2,9 @@
 
 ## Status
 
-Implemented for the controlled M1 fixture.
+Implemented by the production v0.1 beta engine and exercised through the public local CLI contract.
 
-Verdict names, outcomes, precedence, and report fields remain preliminary and are not a stable public API.
+Verdict names, outcome semantics, precedence, and report fields are beta contracts. They are not a stable 1.0 compatibility promise.
 
 ## Purpose
 
@@ -34,18 +34,14 @@ When State B does not pass, State C is not constructed.
 
 ## State C: base plus selected head test
 
-State C starts from the exact base commit and receives only:
-
-```text
-test/qualifies-for-free-shipping.test.js
-```
+State C starts from the exact base commit and receives only the explicitly configured test-envelope paths materialized from head. The original M1 fixture used one selected test file; the production v0.1 engine accepts an explicit set of included paths subject to the same fail-closed boundary validation.
 
 Boundary validation confirms:
 
 - State C is based on base;
-- its implementation matches base;
-- its selected test matches head;
-- its diff contains only the selected test path.
+- its implementation remains consistent with base outside the selected envelope;
+- its selected envelope paths match head;
+- its resulting diff contains only the explicitly selected envelope paths.
 
 ## State outcomes
 
