@@ -2,178 +2,182 @@
 
 ## Purpose
 
-This document defines the release boundary for the Change Proof pre-release package.
+This document defines the release boundary for the Change Proof public beta.
 
-Release preparation is intentionally separated from publication. Passing repository CI or release preflight does not authorize an npm publication, Git tag, GitHub Release, repository visibility change, security-setting change, credential creation, or trusted-publisher configuration.
+Release preparation, npm publication, trusted-publisher configuration, Git tagging, and GitHub Release creation are separate gates. A successful CI or preflight run does not by itself authorize or prove completion of another gate.
 
-## Current bootstrap state
+## Current release candidate
 
-The canonical package is `@changeproof/cli`.
+The canonical npm package is `@changeproof/cli`.
 
-The current candidate version is `0.1.0-beta.1`, and the installed executable is `change-proof`.
+The initial beta version is `0.1.0-beta.1`, the installed executable is `change-proof`, and the npm prerelease dist-tag is `beta`.
 
-The package has not yet been published to npm.
+The source repository is public and GitHub Private Vulnerability Reporting is enabled.
 
-The repository currently retains `"private": true` in `package.json` as an intentional publication safety lock.
+The `main` branch is protected and requires the project's GitHub Actions CI check.
 
-The repository release preflight must not remove or bypass that lock.
+The release-candidate manifest is intentionally publishable: the earlier `"private": true` bootstrap safety lock is removed only in the reviewed release-candidate change.
 
-There are currently no public Git tags or GitHub Releases for Change Proof.
+Until the bootstrap publication completes, `@changeproof/cli` must remain absent from the npm registry and the corresponding Git tag and GitHub Release must remain absent.
 
-## Release preflight
+## Release candidate preflight
 
 `.github/workflows/release-preflight.yml` is a non-publishing workflow.
 
-It exists only to reproduce release-candidate validation on a GitHub-hosted Node.js 24 runner.
-
-The preflight:
+It:
 
 - is manual-only;
 - runs only against `main`;
-- has `contents: read` permission;
+- has `contents: read` permission only;
 - has no OIDC token permission;
 - receives no npm publication credential;
-- performs no publication;
+- performs no npm publication;
 - creates no Git tag or GitHub Release;
 - changes no repository or npm settings;
-- requires the publication safety lock to remain active;
-- requires the bootstrap package name to remain absent from the npm registry;
+- requires the exact publishable package identity and version;
+- requires the package to remain absent from npm during bootstrap;
 - requires the candidate Git tag to remain absent;
+- verifies public repository identity and that GitHub Private Vulnerability Reporting remains enabled;
 - runs the full regression suite;
-- validates the npm package projection;
+- validates the exact npm package projection;
 - finishes with a clean checkout and no generated tarball artifact.
 
-A successful preflight means only that the current unpublished candidate satisfies the recorded bootstrap checks.
+A successful preflight proves only that the selected unpublished release candidate passed those checks.
 
-It is not a release authorization.
+## Why the first npm publication is special
 
-## Why the first publication is different
+npm Trusted Publishing cannot be configured for a package that does not yet exist in the registry.
 
-npm trusted-publisher relationships and staged publishing require the package to already exist in the npm registry.
+npm staged publishing also requires the package to already exist.
 
-Because `@changeproof/cli` does not yet exist, the first publication cannot itself be authenticated through a pre-existing trusted-publisher relationship for that package.
+Therefore the first `@changeproof/cli` publication is a one-time direct bootstrap publication.
 
-The first publication is therefore a one-time bootstrap operation.
+After that first package exists, releases should migrate away from the bootstrap credential model.
 
-That bootstrap operation is outside the M6.4 preflight workflow and requires a separate explicit release decision.
+## Bootstrap publication workflow
 
-## Bootstrap publication gate
+`.github/workflows/bootstrap-publish.yml` is the one-time publication workflow.
 
-Before the first npm publication, all of the following must be reviewed explicitly:
+It is intentionally manual-only and runs on a GitHub-hosted Node.js 24 runner.
 
-1. the exact release commit;
-2. the final package version and prerelease dist-tag;
-3. the full regression and consumer acceptance result;
-4. the exact npm package projection;
-5. public repository visibility if provenance is required;
-6. the removal of `"private": true`;
-7. the public vulnerability-reporting configuration and `SECURITY.md`;
-8. the authentication mechanism for the one-time bootstrap publication;
-9. the provenance configuration;
-10. post-publication installation and CLI acceptance;
-11. Git tag and GitHub prerelease creation.
+The workflow requires:
 
-None of these state-changing operations is authorized by this document.
+- execution from `main`;
+- an operator-supplied exact reviewed release commit;
+- an operator-supplied exact expected version;
+- the GitHub run SHA to equal that reviewed commit;
+- `@changeproof/cli` to still be absent from npm;
+- the candidate Git tag to still be absent;
+- the canonical GitHub repository to remain public with Private Vulnerability Reporting enabled;
+- the full regression suite to pass;
+- the exact package projection to pass;
+- an environment-scoped temporary npm bootstrap credential;
+- GitHub OIDC permission for npm provenance.
 
-## Preferred bootstrap publication model
+The workflow publishes exactly:
 
-For the first public package, the preferred model is a one-time GitHub-hosted publication from the exact reviewed release commit after the repository is public.
+- package: `@changeproof/cli`;
+- version: `0.1.0-beta.1`;
+- access: public;
+- dist-tag: `beta`;
+- provenance: enabled.
 
-The bootstrap publication should:
+It does not create a Git tag or GitHub Release.
 
-- publish `@changeproof/cli` as a public scoped package;
-- use an explicit prerelease dist-tag rather than implicitly promoting the beta to `latest`;
-- generate npm provenance;
-- use a narrowly scoped temporary publication credential only for the bootstrap operation;
-- expose no credential in repository files or logs;
-- be verified immediately from the public registry after publication.
+The workflow must not be dispatched until its exact commit, package projection, npm authentication mechanism, and environment secret have been independently verified.
 
-Credential creation, secret configuration, repository visibility changes, and the bootstrap publish itself require separate explicit approval.
+## Bootstrap credential
 
-## Trusted publishing after bootstrap
+The bootstrap credential is temporary and exists only because the package cannot use a pre-existing npm trusted-publisher relationship before its first publication.
 
-After the package exists in npm, token-based automation should not remain the steady-state release mechanism.
+Immediately before creating that credential, the current npm authentication requirements must be rechecked.
 
-The preferred steady-state model is npm Trusted Publishing from GitHub Actions using OIDC.
+The credential must:
 
-The trusted relationship must bind the package to:
-
-- the exact GitHub repository;
-- the exact release workflow filename;
-- the intended GitHub-hosted execution environment;
-- only the publication operation actually required by the release process.
-
-The npm CLI used to manage the trust relationship must meet the current `npm trust` version requirement.
-
-The workflow must use only the minimum GitHub permissions required for OIDC publication.
-
-## Preferred staged-release posture
-
-When supported by the selected npm CLI and package configuration, the preferred steady-state publishing posture is:
-
-1. CI submits the package with trusted OIDC authentication;
-2. the trusted publisher is allowed to stage, not directly publish;
-3. a maintainer reviews the staged artifact;
-4. a maintainer approves publication with 2FA;
-5. traditional automation tokens are disallowed;
-6. any bootstrap publication token is revoked.
-
-This keeps proof-of-presence in the release process while avoiding a long-lived npm publication token in GitHub Actions.
+- be limited to the npm bootstrap publication purpose;
+- be stored only as the `NPM_BOOTSTRAP_TOKEN` secret of the `npm-bootstrap` GitHub environment;
+- never be committed to the repository;
+- never be printed in logs;
+- be revoked after Trusted Publishing has been configured and verified.
 
 ## Provenance
 
-Provenance is part of the intended public release contract.
+The first publication is performed from the public canonical GitHub repository on a GitHub-hosted runner with npm provenance enabled.
 
-npm provenance requires the source repository used for the publication to be public.
+The `repository.url` metadata must continue to match the canonical GitHub repository.
 
-A package published from the current private repository cannot satisfy that provenance objective.
+A release must not claim provenance unless the npm registry exposes the expected provenance for the published package.
 
-Repository visibility therefore remains a separate explicit release gate.
+## Post-bootstrap verification
 
-## GitHub Actions supply chain
+A successful `npm publish` command is not sufficient to complete the release.
 
-Release-related workflows must follow the same action supply-chain discipline as CI.
+After publication:
 
-GitHub Actions dependencies must be pinned to exact reviewed commit SHAs.
+1. verify `@changeproof/cli@0.1.0-beta.1` from the public registry;
+2. verify `beta` points exactly to `0.1.0-beta.1`;
+3. verify the beta did not establish an unintended stable `latest` contract;
+4. verify package metadata, license, engine requirement, repository identity, binary mapping, and package inventory;
+5. verify npm provenance;
+6. install the package in a clean consumer;
+7. verify `change-proof --version` and `change-proof --help`;
+8. verify `npx @changeproof/cli@beta`;
+9. run a real Change Proof evidence case through the registry-installed package.
 
-The current temporary `actions/setup-node` security-fix pin remains in use until upstream publishes a reviewed immutable release containing the fix for `GHSA-3jxr-9vmj-r5cp`.
+Only after these checks is the bootstrap package considered accepted.
+
+## Trusted Publishing after bootstrap
+
+After the package exists, configure npm Trusted Publishing for the canonical GitHub repository.
+
+The npm CLI used for trust management must satisfy the current `npm trust` minimum-version requirement.
+
+The preferred steady-state permission is staged publication rather than unrestricted direct publication when the npm feature remains supported:
+
+1. GitHub Actions authenticates through OIDC;
+2. CI stages the package;
+3. the maintainer reviews the staged artifact;
+4. the maintainer approves it with 2FA;
+5. no long-lived publication token remains in GitHub Actions.
+
+After the trusted relationship is verified:
+
+- revoke the temporary bootstrap credential;
+- remove the `NPM_BOOTSTRAP_TOKEN` environment secret;
+- replace or retire the one-time bootstrap workflow;
+- enforce the strongest practical npm token restrictions compatible with Trusted Publishing.
 
 ## Version and tag integrity
 
-A package version is immutable once published.
+An npm package version is immutable once published.
 
-The release process must verify before publication that:
+Before publication, verify that:
 
-- the intended npm version does not already exist;
+- the intended package version does not already exist;
 - the intended Git tag does not already exist;
-- package metadata identifies the canonical repository;
+- the package metadata identifies the canonical repository;
 - the package projection is the reviewed projection;
-- the exact release commit is known.
+- the exact release commit is known;
+- the intended dist-tag is `beta`.
 
-The initial beta should use an explicit prerelease npm dist-tag.
+Do not publish this beta under `latest`.
 
-## Post-publication migration
+## Git tag and GitHub prerelease
 
-After a successful bootstrap publication:
+The Git tag and GitHub prerelease are created only after the npm artifact has passed post-publication verification.
 
-1. verify the public package metadata;
-2. install the package into a clean external consumer;
-3. verify `change-proof --version` and the supported CLI surface;
-4. configure the npm trusted publisher;
-5. verify the trusted relationship;
-6. revoke and remove the bootstrap publication credential;
-7. restrict traditional token publishing where supported;
-8. replace the bootstrap preflight with the reviewed steady-state release workflow;
-9. verify provenance for releases that claim it;
-10. update `SECURITY.md` supported versions;
-11. create the corresponding Git tag and GitHub prerelease only under the approved release procedure.
+The tag must identify the exact reviewed release commit from which the accepted npm package was published.
+
+The initial tag is `v0.1.0-beta.1`.
+
+The GitHub Release must be marked as a prerelease and must describe the beta support boundary and known limitations.
 
 ## Failure policy
 
 Publication is fail-closed.
 
-A mismatch in version, package inventory, repository identity, test result, registry state, tag state, security configuration, provenance prerequisites, or authentication configuration blocks release.
+A mismatch in version, package inventory, repository identity, test result, registry state, tag state, security configuration, provenance prerequisites, authentication configuration, or post-publication acceptance blocks progression.
 
-A failed or partial release must be analyzed before any retry.
+A failed or partial release must be analyzed before retry.
 
-Do not force-push, move an existing public tag, reuse a published package version, or attempt to conceal a partially completed publication.
+Do not force-push, move an existing public tag, reuse a published package version, or attempt to conceal a partial release.

@@ -108,8 +108,11 @@ test(
       );
 
       assert.equal(
-        packageJson.private,
-        true,
+        Object.prototype.hasOwnProperty.call(
+          packageJson,
+          "private",
+        ),
+        false,
       );
 
       assert.deepEqual(
