@@ -37,7 +37,7 @@ The exact repository, commit, state, dependency-projection, determinism, cleanup
 
 The canonical npm package is `@changeproof/cli`, and the installed executable is `change-proof`.
 
-Public beta releases use the explicit `beta` dist-tag. No stable `latest` installation contract is claimed by this beta.
+Public beta releases are intentionally addressed through the explicit `beta` dist-tag. On the initial npm publication the registry also initialized `latest` to `0.1.0-beta.1`. That registry alias does not represent a stable-release contract. During the beta line, consumers should select `@changeproof/cli@beta` explicitly.
 
 Install the beta globally:
 
@@ -172,7 +172,7 @@ Install it with:
 npm install -g @changeproof/cli@beta
 ```
 
-This beta does not claim a stable `latest` channel. Registry publication, package provenance, and the corresponding Git tag and GitHub prerelease are verified as separate release gates.
+The npm registry currently resolves both `beta` and `latest` to the initial prerelease because this is the package's first published version. Only `beta` is the intentional prerelease channel; `latest` must not be described as a stable Change Proof release until an actual stable version is published. Registry publication, provenance, Git tagging, and GitHub prerelease creation remain separate release gates.
 
 ## License
 
