@@ -45,11 +45,11 @@ The `main` branch is protected and requires the project's GitHub Actions CI chec
 
 The release-candidate manifest is intentionally publishable: the earlier `"private": true` bootstrap safety lock is removed only in the reviewed release-candidate change.
 
-Until the bootstrap publication completes, `@changeproof/cli` must remain absent from the npm registry and the corresponding Git tag and GitHub Release must remain absent.
+The bootstrap npm publication is complete. The corresponding Git tag and GitHub prerelease remain deliberately absent until the post-bootstrap Trusted Publishing and credential-retirement gates are complete.
 
-## Release candidate preflight
+## Historical bootstrap release candidate preflight
 
-`.github/workflows/release-preflight.yml` is a non-publishing workflow.
+The bootstrap-only `.github/workflows/release-preflight.yml` workflow was retired after the first npm publication. During bootstrap it was a non-publishing workflow.
 
 It:
 
@@ -81,9 +81,9 @@ Therefore the first `@changeproof/cli` publication is a one-time direct bootstra
 
 After that first package exists, releases should migrate away from the bootstrap credential model.
 
-## Bootstrap publication workflow
+## Historical bootstrap publication workflow
 
-`.github/workflows/bootstrap-publish.yml` is the one-time publication workflow.
+The one-time `.github/workflows/bootstrap-publish.yml` workflow was retired after `0.1.0-beta.1` was published. It was the bootstrap publication workflow.
 
 It is intentionally manual-only and runs on a GitHub-hosted Node.js 24 runner.
 
@@ -169,12 +169,70 @@ The preferred steady-state permission is staged publication rather than unrestri
 4. the maintainer approves it with 2FA;
 5. no long-lived publication token remains in GitHub Actions.
 
-After the trusted relationship is verified:
+After the trusted relationship is configured and its exact registry
+configuration is verified:
 
-- revoke the temporary bootstrap credential;
 - remove the `NPM_BOOTSTRAP_TOKEN` environment secret;
-- replace or retire the one-time bootstrap workflow;
-- enforce the strongest practical npm token restrictions compatible with Trusted Publishing.
+- revoke the temporary bootstrap npm token;
+- set package publishing access to require 2FA and disallow traditional
+  tokens;
+- keep the Trusted Publisher stage-only;
+- use the first real future staging operation as the end-to-end OIDC
+  execution proof.
+
+The bootstrap workflows have already been retired.
+
+## Steady-state staged publishing workflow
+
+Future beta releases use `.github/workflows/npm-stage.yml`.
+
+The workflow is manual-only and is bound to the `npm-release` GitHub
+environment. It receives no npm token.
+
+Its GitHub permissions are limited to:
+
+- `contents: read`;
+- `id-token: write`.
+
+The workflow requires:
+
+- execution from `main`;
+- the exact reviewed main commit as `expected_commit`;
+- the exact beta version already present in `package.json` as
+  `expected_version`;
+- npm CLI `>=11.15.0`;
+- the package version to be absent from the public npm registry;
+- the corresponding Git tag to be absent;
+- the complete regression suite to pass;
+- the package projection to pass;
+- a clean checkout before staging.
+
+The only npm release mutation performed by the workflow is:
+
+`npm stage publish --tag beta --provenance --ignore-scripts`
+
+The npm Trusted Publisher relationship must be configured exactly as:
+
+- package: `@changeproof/cli`;
+- provider: GitHub Actions;
+- repository: `puffynNeroun/change-proof`;
+- workflow filename: `npm-stage.yml`;
+- GitHub environment: `npm-release`;
+- allowed action: `npm stage publish`;
+- direct `npm publish`: not allowed.
+
+The workflow does not approve a staged package, create a Git tag, or create
+a GitHub Release.
+
+After a successful staging run, a maintainer must inspect the staged artifact
+and explicitly approve it with npm 2FA. Approval is the proof-of-presence gate
+that makes the version publicly available.
+
+The trusted relationship is intentionally stage-only. Long-lived or
+bypass-2FA npm tokens are not part of the steady-state publishing path.
+
+The already-published `0.1.0-beta.1` is not restaged or republished through
+this workflow.
 
 ## Version and tag integrity
 
