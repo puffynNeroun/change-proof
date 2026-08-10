@@ -1,17 +1,16 @@
 # Security Policy
 
-## Project status and supported versions
+## Supported versions
 
-Change Proof is currently a pre-release beta and has not been published to npm.
+Change Proof is a public pre-release beta.
 
-| Distribution | Security support |
+| Version or branch | Security support |
 | --- | --- |
-| Current `main` branch | Active pre-release development |
-| Published npm releases | None yet |
+| Current `0.1.0-beta.x` release line | Supported while it is the current public beta |
+| Current `main` branch | Active development |
+| Older pre-release lines | No long-term support commitment |
 
-There is currently no released npm version for which a long-term security-support commitment is made.
-
-This section must be updated when the first public package is released so that supported and unsupported release lines are explicit.
+Security support during beta is best-effort. The project does not currently promise a fixed remediation SLA.
 
 ## Security boundary
 
@@ -36,13 +35,13 @@ Do not run Change Proof against code or commands that you do not trust.
 
 ## Reporting a vulnerability
 
+Use GitHub Private Vulnerability Reporting for security vulnerabilities in Change Proof.
+
+Open the repository's **Security** section and choose **Report a vulnerability**. This creates a private report for the maintainer.
+
 Do not disclose vulnerability details, proof-of-concept payloads, credentials, or exploit instructions in a public issue, discussion, or pull request.
 
-While this repository remains private, authorized collaborators should report security issues privately to the repository maintainer through an existing private collaboration channel.
-
-When this repository becomes public, the preferred reporting mechanism will be GitHub Private Vulnerability Reporting once that feature has been explicitly enabled for the repository.
-
-If the repository is public and no private vulnerability-reporting mechanism is available, open a public issue containing only a request for a private security contact. Do not include vulnerability details in that issue.
+If GitHub Private Vulnerability Reporting is temporarily unavailable, open a public issue containing only a request for a private security contact. Do not include vulnerability details in that issue.
 
 A useful private report should include:
 
@@ -87,20 +86,20 @@ The following are explicit product limitations and are not security vulnerabilit
 
 A bug inside one of these areas may still be security-relevant if it causes Change Proof to violate a stronger guarantee that the project actually makes.
 
+## Repository security posture
+
+The public repository uses GitHub Private Vulnerability Reporting.
+
+The protected `main` branch requires the project CI check, blocks force-push and deletion, applies protection to administrators, and requires review conversations to be resolved.
+
+GitHub Actions defaults to read-only repository permissions. Workflows that need stronger permissions must declare only the permissions required for that workflow.
+
+The one-time bootstrap npm publication and later steady-state publishing are separate release-security gates. Long-lived npm publication credentials are not part of the intended steady-state design.
+
 ## Coordinated disclosure
 
-Please allow the maintainers an opportunity to reproduce, assess, and remediate a reported vulnerability before public disclosure.
+Please allow the maintainer an opportunity to reproduce, assess, and remediate a reported vulnerability before public disclosure.
 
-The project does not currently promise a fixed response or remediation SLA, a bug bounty, or automatic CVE assignment.
+The project does not currently promise a bug bounty, automatic CVE assignment, or a fixed response/remediation SLA.
 
-When appropriate for a future public release, repository security advisories and coordinated disclosure may be used to develop and publish a fix.
-
-## Public-release security gate
-
-Before the first public repository and npm release, the release process must revisit this policy and verify that:
-
-- supported public versions are listed accurately;
-- a functioning private vulnerability-reporting channel is available;
-- GitHub Private Vulnerability Reporting is enabled if it remains the selected reporting mechanism;
-- reporting instructions match the actual repository configuration;
-- no placeholder or nonexistent security contact is published.
+When appropriate, GitHub repository security advisories may be used to coordinate a fix and disclosure.

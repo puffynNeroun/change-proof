@@ -19,7 +19,6 @@
     "git"
   ],
   "type": "module",
-  "private": true,
   "publishConfig": {
     "access": "public"
   },

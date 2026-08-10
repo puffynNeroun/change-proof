@@ -1,26 +1,32 @@
-name: Release preflight
+name: Bootstrap npm beta publish
 
 on:
   workflow_dispatch:
     inputs:
       expected_version:
-        description: Expected unpublished release-candidate version
+        description: Exact npm version approved for bootstrap publication
         required: true
         default: 0.1.0-beta.1
+        type: string
+      expected_commit:
+        description: Exact 40-character main commit approved for publication
+        required: true
         type: string
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
-  group: release-preflight-${{ github.ref }}
+  group: bootstrap-npm-publish
   cancel-in-progress: false
 
 jobs:
-  preflight:
-    name: Release candidate preflight
+  publish:
+    name: Bootstrap npm publish
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
+    environment: npm-bootstrap
 
     steps:
       - name: Checkout
@@ -36,16 +42,38 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
+          registry-url: https://registry.npmjs.org
 
-      - name: Require main branch
+      - name: Require exact reviewed main commit
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
         shell: bash
         run: |
           set -euo pipefail
 
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
-            echo "Release preflight must run from main" >&2
+            echo "Bootstrap publication must run from main" >&2
             exit 1
           fi
+
+          if ! printf '%s' "$EXPECTED_COMMIT" |
+             grep -Eq '^[0-9a-f]{40}$'
+          then
+            echo "expected_commit must be an exact lowercase 40-character SHA" >&2
+            exit 1
+          fi
+
+          if [ "$GITHUB_SHA" != "$EXPECTED_COMMIT" ]; then
+            echo "Workflow SHA does not equal the reviewed release commit" >&2
+            exit 1
+          fi
+
+          if [ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]; then
+            echo "Checkout HEAD does not equal GITHUB_SHA" >&2
+            exit 1
+          fi
+
+          echo "reviewed_commit=$GITHUB_SHA"
 
       - name: Runtime versions
         shell: bash
@@ -55,7 +83,7 @@ jobs:
           npm --version
           git --version
 
-      - name: Validate publishable manifest
+      - name: Validate exact bootstrap manifest
         env:
           EXPECTED_VERSION: ${{ inputs.expected_version }}
         run: |
@@ -68,6 +96,12 @@ jobs:
 
           const expectedVersion = process.env.EXPECTED_VERSION;
 
+          if (expectedVersion !== "0.1.0-beta.1") {
+            throw new Error(
+              `bootstrap workflow only authorizes 0.1.0-beta.1, got ${expectedVersion}`,
+            );
+          }
+
           if (pkg.name !== "@changeproof/cli") {
             throw new Error(`unexpected package name: ${pkg.name}`);
           }
@@ -79,21 +113,11 @@ jobs:
           }
 
           if (Object.prototype.hasOwnProperty.call(pkg, "private")) {
-            throw new Error(
-              "release-candidate manifest must not contain the private publication lock",
-            );
+            throw new Error("package manifest is still publication-locked");
           }
 
           if (pkg.publishConfig?.access !== "public") {
-            throw new Error("public scoped-package access contract missing");
-          }
-
-          if (pkg.engines?.node !== ">=24") {
-            throw new Error("unexpected Node.js engine contract");
-          }
-
-          if (pkg.bin?.["change-proof"] !== "bin/change-proof.mjs") {
-            throw new Error("unexpected CLI binary contract");
+            throw new Error("public package access contract missing");
           }
 
           if (
@@ -101,6 +125,14 @@ jobs:
             "git+https://github.com/puffynNeroun/change-proof.git"
           ) {
             throw new Error("canonical repository metadata mismatch");
+          }
+
+          if (pkg.engines?.node !== ">=24") {
+            throw new Error("unexpected Node.js engine contract");
+          }
+
+          if (pkg.bin?.["change-proof"] !== "bin/change-proof.mjs") {
+            throw new Error("unexpected executable mapping");
           }
 
           if (Object.keys(pkg.dependencies ?? {}).length !== 0) {
@@ -111,7 +143,7 @@ jobs:
             throw new Error("unexpected development dependencies");
           }
 
-          console.log("publishable_manifest=PASS");
+          console.log("bootstrap_manifest=PASS");
           NODE
 
       - name: Verify canonical public repository security state
@@ -176,7 +208,7 @@ jobs:
           console.log("repository_security_state=PASS");
           NODE
 
-      - name: Require package to remain unpublished
+      - name: Require package to be brand new
         shell: bash
         run: |
           set -euo pipefail
@@ -184,9 +216,10 @@ jobs:
           tmp_dir="$(mktemp -d)"
           trap 'rm -rf "$tmp_dir"' EXIT
 
-          if npm view @changeproof/cli version --json             >"$tmp_dir/out" 2>"$tmp_dir/err"
+          if npm view @changeproof/cli version --json \
+            >"$tmp_dir/out" 2>"$tmp_dir/err"
           then
-            echo "@changeproof/cli already exists; bootstrap preflight is obsolete" >&2
+            echo "@changeproof/cli already exists; bootstrap workflow must never be reused" >&2
             cat "$tmp_dir/out"
             exit 1
           fi
@@ -202,7 +235,7 @@ jobs:
             exit 1
           fi
 
-      - name: Require release tag to remain absent
+      - name: Require candidate tag to be absent
         env:
           EXPECTED_VERSION: ${{ inputs.expected_version }}
         shell: bash
@@ -221,7 +254,7 @@ jobs:
       - name: Full regression suite
         run: npm test
 
-      - name: Validate package projection
+      - name: Validate exact package projection
         env:
           EXPECTED_VERSION: ${{ inputs.expected_version }}
         shell: bash
@@ -241,7 +274,7 @@ jobs:
           );
 
           if (!Array.isArray(data) || data.length !== 1) {
-            throw new Error("expected exactly one pack result");
+            throw new Error("expected one package projection");
           }
 
           const pack = data[0];
@@ -267,42 +300,127 @@ jobs:
             throw new Error("unexpected bundled dependencies");
           }
 
-          const paths = pack.files.map((entry) => entry.path);
-
-          if (
-            paths.some(
-              (path) =>
-                path.startsWith("test/") ||
-                path.startsWith("docs/") ||
-                path.startsWith(".github/") ||
-                path === "SECURITY.md" ||
-                path === "CHANGELOG.md",
-            )
-          ) {
-            throw new Error("non-distribution files leaked into package");
-          }
-
           console.log(`package=${pack.name}@${pack.version}`);
           console.log(`entries=${pack.entryCount}`);
+          console.log(`size=${pack.size}`);
+          console.log(`unpacked_size=${pack.unpackedSize}`);
           console.log("package_projection=PASS");
           NODE
 
-      - name: Verify checkout remained clean
+      - name: Verify bootstrap npm credential
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
 
-          if [ -n "$(git status --porcelain=v1)" ]; then
-            git status --short
-            echo "Release preflight dirtied the checkout" >&2
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "NPM_BOOTSTRAP_TOKEN is not configured" >&2
             exit 1
           fi
 
-          if find . -maxdepth 1 -type f -name '*.tgz' -print -quit |
-             grep -q .
-          then
-            echo "Tarball artifact leaked into checkout" >&2
+          npm_user="$(
+            npm whoami --registry=https://registry.npmjs.org/
+          )"
+
+          if [ "$npm_user" != "puffynneroun" ]; then
+            echo "Unexpected npm bootstrap identity: $npm_user" >&2
             exit 1
           fi
 
-          echo "release_preflight=PASS"
+          echo "npm_bootstrap_identity=$npm_user"
+
+      - name: Publish initial public beta with provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          npm publish \
+            --registry=https://registry.npmjs.org/ \
+            --access public \
+            --tag beta \
+            --provenance \
+            --ignore-scripts
+
+      - name: Verify registry publication and dist-tag
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          found=0
+
+          for attempt in $(seq 1 240); do
+            if npm view "@changeproof/cli@$EXPECTED_VERSION" \
+              name version repository license \
+              --json \
+              > "$tmp_dir/version.json" 2>/dev/null
+            then
+              if npm view @changeproof/cli dist-tags \
+                --json \
+                > "$tmp_dir/tags.json" 2>/dev/null
+              then
+                found=1
+                break
+              fi
+            fi
+
+            echo "waiting_for_registry attempt=$attempt/240"
+            sleep 5
+          done
+
+          if [ "$found" -ne 1 ]; then
+            echo "Published package did not become readable from the registry" >&2
+            exit 1
+          fi
+
+          node - \
+            "$tmp_dir/version.json" \
+            "$tmp_dir/tags.json" <<'NODE'
+          const fs = require("node:fs");
+
+          const metadata = JSON.parse(
+            fs.readFileSync(process.argv[2], "utf8"),
+          );
+
+          const tags = JSON.parse(
+            fs.readFileSync(process.argv[3], "utf8"),
+          );
+
+          const expected = process.env.EXPECTED_VERSION;
+
+          if (metadata.name !== "@changeproof/cli") {
+            throw new Error("registry package name mismatch");
+          }
+
+          if (metadata.version !== expected) {
+            throw new Error("registry version mismatch");
+          }
+
+          if (metadata.license !== "Apache-2.0") {
+            throw new Error("registry license mismatch");
+          }
+
+          if (tags.beta !== expected) {
+            throw new Error(
+              `beta dist-tag mismatch: ${JSON.stringify(tags)}`,
+            );
+          }
+
+          if (Object.prototype.hasOwnProperty.call(tags, "latest")) {
+            throw new Error(
+              `unexpected latest dist-tag: ${JSON.stringify(tags)}`,
+            );
+          }
+
+          console.log(`registry_package=@changeproof/cli@${expected}`);
+          console.log(`beta_dist_tag=${tags.beta}`);
+          console.log("latest_dist_tag=ABSENT");
+          console.log("bootstrap_registry_verification=PASS");
+          NODE

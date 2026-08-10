@@ -4,9 +4,11 @@ Change Proof is a local evidence tool for checking whether explicitly selected c
 
 ## Current status
 
-**Research stage: local v0.1 public CLI beta candidate**
+**Public v0.1 beta: `0.1.0-beta.1`**
 
-The repository contains a verified production three-state engine and a thin, configuration-driven CLI candidate. Its local v0.1 beta evidence model has now been validated on two external repositories: the earlier Rulden pilot and the project-forge nested `node:test` pilot. The CLI is a beta contract for local evaluation, not a stable-release, production-readiness, publication-readiness, or correctness claim.
+The Change Proof repository is public. The production three-state evidence engine and configuration-driven CLI have been validated on two bounded external repository cases: the earlier Rulden pilot and the project-forge nested `node:test` pilot.
+
+The initial npm distribution uses the canonical package `@changeproof/cli` and the explicit `beta` dist-tag. This remains a beta contract: it is not a stable-release, production-readiness, general correctness, broad framework-support, or sandboxing claim.
 
 ## What M2.10 proved
 
@@ -29,25 +31,44 @@ The second external validation exercises the public binary against project-forge
 CHANGE_PROOF_M4_PROJECT_FORGE_REPOSITORY=/absolute/path/to/project-forge node --test --test-reporter=tap test/integration/m4-project-forge-public-cli.test.mjs
 ```
 
-The exact repository, commit, state, dependency-projection, determinism, cleanup, and non-claim contract is recorded in [`docs/M4_SECOND_EXTERNAL_VALIDATION.md`](docs/M4_SECOND_EXTERNAL_VALIDATION.md). These two bounded pilots do not imply broad framework support, automatic framework or dependency discovery, npm publication, GitHub Action availability, release readiness, CI readiness, security-policy readiness, or production sandboxing.
+The exact repository, commit, state, dependency-projection, determinism, cleanup, and non-claim contract is recorded in [`docs/M4_SECOND_EXTERNAL_VALIDATION.md`](docs/M4_SECOND_EXTERNAL_VALIDATION.md). These two bounded pilots do not imply broad framework support, automatic framework or dependency discovery, general implementation correctness, complete regression coverage, stable-release maturity, or production sandboxing.
 
-## Installation status
+## Installation
 
-Change Proof is not published to npm. The canonical planned package is `@changeproof/cli`, the installed executable remains `change-proof`, and the manifest remains `private: true` until the publication stage. Use the local checkout for now; the planned public installation contract is documented below.
+The canonical npm package is `@changeproof/cli`, and the installed executable is `change-proof`.
 
-Run the local checkout with Node.js 24 or newer:
+Public beta releases use the explicit `beta` dist-tag. No stable `latest` installation contract is claimed by this beta.
+
+Install the beta globally:
 
 ```text
-node bin/change-proof.mjs run --config change-proof.config.json
+npm install -g @changeproof/cli@beta
 ```
 
-The future installed package-surface syntax is:
+Verify the installed CLI:
+
+```text
+change-proof --version
+change-proof --help
+```
+
+Run an evidence check:
 
 ```text
 change-proof run --config change-proof.config.json
 ```
 
-That syntax documents the binary contract; it is not a claim that an npm package has been published.
+Or run the beta without a global installation:
+
+```text
+npx --yes @changeproof/cli@beta run --config change-proof.config.json
+```
+
+During the one-time bootstrap window, if the npm registry does not yet resolve `@changeproof/cli@beta`, run the exact repository checkout with Node.js 24 or newer:
+
+```text
+node bin/change-proof.mjs run --config change-proof.config.json
+```
 
 ## Configuration
 
@@ -141,13 +162,17 @@ M4.2 repeats the local beta evidence observation on project-forge's nested `node
 
 ## Distribution identity
 
-The canonical npm package identity for the planned public beta is `@changeproof/cli`. The installed executable remains `change-proof`.
+The canonical npm package is `@changeproof/cli`. The installed executable is `change-proof`.
 
-The package has not been published to npm yet. The manifest intentionally keeps `"private": true` while release preparation continues. `publishConfig.access` is set to `"public"` for the eventual scoped public release.
+The initial public beta line is `0.1.0-beta.1` and is distributed under the explicit npm `beta` dist-tag.
 
-After publication, install it with `npm install -g @changeproof/cli` and invoke it as `change-proof`.
+Install it with:
 
-Until publication, use the repository-checkout workflow documented above.
+```text
+npm install -g @changeproof/cli@beta
+```
+
+This beta does not claim a stable `latest` channel. Registry publication, package provenance, and the corresponding Git tag and GitHub prerelease are verified as separate release gates.
 
 ## License
 
