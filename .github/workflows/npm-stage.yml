@@ -1,0 +1,449 @@
+name: Stage npm beta release
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: Exact beta version present in package.json
+        required: true
+        type: string
+      expected_commit:
+        description: Exact reviewed main commit to stage
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-stage-release
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    name: Stage npm package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm-release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@e51e5fe84fc33b4c73ebe40526b2694712b5b858
+        with:
+          node-version: 24
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Require exact reviewed main commit
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "npm staging must run from main" >&2
+            exit 1
+          fi
+
+          if ! printf '%s' "$EXPECTED_COMMIT" |
+             grep -Eq '^[0-9a-f]{40}$'
+          then
+            echo "expected_commit must be an exact lowercase SHA" >&2
+            exit 1
+          fi
+
+          if [ "$GITHUB_SHA" != "$EXPECTED_COMMIT" ]; then
+            echo "workflow SHA differs from reviewed commit" >&2
+            exit 1
+          fi
+
+          if [ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]; then
+            echo "checkout HEAD differs from GITHUB_SHA" >&2
+            exit 1
+          fi
+
+          echo "reviewed_commit=$GITHUB_SHA"
+
+      - name: Require supported release runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --version
+          npm --version
+          git --version
+
+          node <<'NODE'
+          const { execFileSync } = require("node:child_process");
+
+          const raw = execFileSync(
+            "npm",
+            ["--version"],
+            { encoding: "utf8" },
+          ).trim();
+
+          const match = raw.match(
+            /^(\d+)\.(\d+)\.(\d+)$/,
+          );
+
+          if (!match) {
+            throw new Error(
+              `unexpected npm version: ${raw}`,
+            );
+          }
+
+          const version = match
+            .slice(1)
+            .map(Number);
+
+          const minimum = [11, 15, 0];
+
+          const supported =
+            version[0] > minimum[0] ||
+            (
+              version[0] === minimum[0] &&
+              version[1] > minimum[1]
+            ) ||
+            (
+              version[0] === minimum[0] &&
+              version[1] === minimum[1] &&
+              version[2] >= minimum[2]
+            );
+
+          if (!supported) {
+            throw new Error(
+              `npm >=11.15.0 required, got ${raw}`,
+            );
+          }
+
+          console.log(
+            `staged_publishing_npm=${raw}`,
+          );
+          NODE
+
+      - name: Validate release manifest
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const pkg = JSON.parse(
+            fs.readFileSync(
+              "package.json",
+              "utf8",
+            ),
+          );
+
+          const expected =
+            process.env.EXPECTED_VERSION;
+
+          if (
+            !/^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$/
+              .test(expected)
+          ) {
+            throw new Error(
+              `expected_version is not a beta semver: ${expected}`,
+            );
+          }
+
+          if (pkg.name !== "@changeproof/cli") {
+            throw new Error(
+              `unexpected package name: ${pkg.name}`,
+            );
+          }
+
+          if (pkg.version !== expected) {
+            throw new Error(
+              `manifest version ${pkg.version} != ${expected}`,
+            );
+          }
+
+          if (
+            Object.prototype.hasOwnProperty.call(
+              pkg,
+              "private",
+            )
+          ) {
+            throw new Error(
+              "package manifest contains private lock",
+            );
+          }
+
+          if (
+            pkg.publishConfig?.access !== "public"
+          ) {
+            throw new Error(
+              "public publishConfig missing",
+            );
+          }
+
+          if (
+            pkg.repository?.url !==
+            "git+https://github.com/puffynNeroun/change-proof.git"
+          ) {
+            throw new Error(
+              "repository metadata mismatch",
+            );
+          }
+
+          if (pkg.engines?.node !== ">=24") {
+            throw new Error(
+              "Node engine contract mismatch",
+            );
+          }
+
+          if (
+            pkg.bin?.["change-proof"] !==
+            "bin/change-proof.mjs"
+          ) {
+            throw new Error(
+              "binary mapping mismatch",
+            );
+          }
+
+          if (
+            Object.keys(
+              pkg.dependencies ?? {},
+            ).length !== 0
+          ) {
+            throw new Error(
+              "unexpected runtime dependencies",
+            );
+          }
+
+          if (
+            Object.keys(
+              pkg.devDependencies ?? {},
+            ).length !== 0
+          ) {
+            throw new Error(
+              "unexpected development dependencies",
+            );
+          }
+
+          console.log(
+            `release_package=${pkg.name}@${pkg.version}`,
+          );
+          console.log(
+            "release_manifest=PASS",
+          );
+          NODE
+
+      - name: Require version to be unpublished
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          if npm view \
+            "@changeproof/cli@$EXPECTED_VERSION" \
+            version \
+            --registry=https://registry.npmjs.org/ \
+            >"$tmp_dir/out" \
+            2>"$tmp_dir/err"
+          then
+            echo \
+              "@changeproof/cli@$EXPECTED_VERSION already exists" \
+              >&2
+            exit 1
+          fi
+
+          if grep -q 'E404' "$tmp_dir/out" ||
+             grep -q 'E404' "$tmp_dir/err"
+          then
+            echo "registry_version_state=UNPUBLISHED"
+          else
+            cat "$tmp_dir/out" >&2 || true
+            cat "$tmp_dir/err" >&2 || true
+            echo "unexpected npm registry failure" >&2
+            exit 1
+          fi
+
+      - name: Require candidate Git tag to be absent
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="v$EXPECTED_VERSION"
+
+          if git rev-parse -q \
+            --verify "refs/tags/$tag" \
+            >/dev/null
+          then
+            echo "candidate Git tag already exists: $tag" >&2
+            exit 1
+          fi
+
+          echo "candidate_git_tag=ABSENT"
+
+      - name: Full regression suite
+        run: npm test
+
+      - name: Validate package projection
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          npm pack \
+            --dry-run \
+            --ignore-scripts \
+            --json \
+            > "$tmp_dir/pack.json"
+
+          node - "$tmp_dir/pack.json" <<'NODE'
+          const fs = require("node:fs");
+
+          const data = JSON.parse(
+            fs.readFileSync(
+              process.argv[2],
+              "utf8",
+            ),
+          );
+
+          if (
+            !Array.isArray(data) ||
+            data.length !== 1
+          ) {
+            throw new Error(
+              "expected one npm package projection",
+            );
+          }
+
+          const pack = data[0];
+          const expected =
+            process.env.EXPECTED_VERSION;
+
+          if (
+            pack.name !== "@changeproof/cli"
+          ) {
+            throw new Error(
+              `unexpected package: ${pack.name}`,
+            );
+          }
+
+          if (pack.version !== expected) {
+            throw new Error(
+              `unexpected version: ${pack.version}`,
+            );
+          }
+
+          if (
+            !Array.isArray(pack.bundled) ||
+            pack.bundled.length !== 0
+          ) {
+            throw new Error(
+              "unexpected bundled dependencies",
+            );
+          }
+
+          const paths = pack.files.map(
+            (entry) => entry.path,
+          );
+
+          if (
+            paths.some(
+              (path) =>
+                path.startsWith("test/") ||
+                path.startsWith("docs/") ||
+                path.startsWith(".github/") ||
+                path === "SECURITY.md" ||
+                path === "CHANGELOG.md",
+            )
+          ) {
+            throw new Error(
+              "non-distribution files leaked into package",
+            );
+          }
+
+          console.log(
+            `package=${pack.name}@${pack.version}`,
+          );
+          console.log(
+            `entries=${pack.entryCount}`,
+          );
+          console.log(
+            `size=${pack.size}`,
+          );
+          console.log(
+            `unpacked_size=${pack.unpackedSize}`,
+          );
+          console.log(
+            "package_projection=PASS",
+          );
+          NODE
+
+      - name: Verify checkout remained clean
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "$(git status --porcelain=v1)" ]; then
+            git status --short
+            echo "release validation dirtied checkout" >&2
+            exit 1
+          fi
+
+          if find . \
+            -maxdepth 1 \
+            -type f \
+            -name '*.tgz' \
+            -print -quit |
+            grep -q .
+          then
+            echo "tarball leaked into checkout" >&2
+            exit 1
+          fi
+
+          echo "release_checkout_clean=PASS"
+
+      - name: Stage package through npm Trusted Publishing
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          npm stage publish \
+            --tag beta \
+            --provenance \
+            --ignore-scripts
+
+          echo \
+            "npm_stage_submission=@changeproof/cli@$EXPECTED_VERSION"
+          echo "npm_stage_submission=PASS"
+
+      - name: Record proof-of-presence boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo \
+            "The package is staged only. This workflow does not approve it."
+          echo \
+            "A maintainer must review and approve the staged package with npm 2FA."
+          echo \
+            "No Git tag or GitHub Release is created by this workflow."
+          echo "proof_of_presence_boundary=PASS"
