@@ -14,6 +14,33 @@ The initial beta version is `0.1.0-beta.1`, the installed executable is `change-
 
 The source repository is public and GitHub Private Vulnerability Reporting is enabled.
 
+## Observed bootstrap publication result
+
+The first public npm publication completed from reviewed commit
+`c079a9440340220965886e7dcbef1b40a3a020c3`.
+
+The publication step for `@changeproof/cli@0.1.0-beta.1` succeeded and produced
+a public package with npm registry signature and provenance attestation.
+
+The publication command explicitly requested the `beta` dist-tag. On this first
+publication the npm registry exposed both:
+
+- `beta` -> `0.1.0-beta.1`;
+- `latest` -> `0.1.0-beta.1`.
+
+The bootstrap workflow originally treated any `latest` tag as a failure. That
+postcondition was incorrect for the observed first-package registry behavior.
+The failed workflow conclusion therefore does not mean the package publication
+failed: the `npm publish` step succeeded, and the public artifact, package
+projection, consumer installation, CLI surface, registry signature, and
+provenance were independently verified.
+
+The `latest` mapping is recorded as registry state, not as a Change Proof stable
+release promise. During the beta line, release documentation and installation
+examples must continue to use `@changeproof/cli@beta` explicitly.
+
+The one-time bootstrap workflow must not be reused after this publication.
+
 The `main` branch is protected and requires the project's GitHub Actions CI check.
 
 The release-candidate manifest is intentionally publishable: the earlier `"private": true` bootstrap safety lock is removed only in the reviewed release-candidate change.
@@ -79,8 +106,10 @@ The workflow publishes exactly:
 - package: `@changeproof/cli`;
 - version: `0.1.0-beta.1`;
 - access: public;
-- dist-tag: `beta`;
+- requested dist-tag: `beta`;
 - provenance: enabled.
+
+For the initial package publication, npm also initialized `latest` to `0.1.0-beta.1`. The release process records that alias but does not treat it as a stable release channel.
 
 It does not create a Git tag or GitHub Release.
 
@@ -116,7 +145,7 @@ After publication:
 
 1. verify `@changeproof/cli@0.1.0-beta.1` from the public registry;
 2. verify `beta` points exactly to `0.1.0-beta.1`;
-3. verify the beta did not establish an unintended stable `latest` contract;
+3. record the actual registry `latest` mapping and ensure documentation does not represent the prerelease as a stable release;
 4. verify package metadata, license, engine requirement, repository identity, binary mapping, and package inventory;
 5. verify npm provenance;
 6. install the package in a clean consumer;
@@ -160,7 +189,7 @@ Before publication, verify that:
 - the exact release commit is known;
 - the intended dist-tag is `beta`.
 
-Do not publish this beta under `latest`.
+Release commands for the beta line must explicitly request `beta`; they must not intentionally target `latest`. The registry-created initial `latest` alias is recorded compatibility state and is not a stable-release claim.
 
 ## Git tag and GitHub prerelease
 
