@@ -840,6 +840,7 @@ function collectNodeTestEvidence(
     output,
     tapVersionPresent,
     summary,
+    leafTestResults,
     failedSubtests,
     failedTestResults,
     nestedTapPresent:
@@ -865,6 +866,272 @@ function collectNodeTestEvidence(
     hasCompleteSummary,
     testDiscovered,
     testExecuted,
+  };
+}
+
+
+function containsUnsafeFailureSpecificContent(
+  value,
+) {
+  return (
+    /(?:^|[\s("'`])(?:file:\/\/\/|\/[^\s"'`]+|[A-Za-z]:[\\/][^\s"'`]+)/
+      .test(value) ||
+    /:\d+:\d+(?:$|[\s)])/u
+      .test(value)
+  );
+}
+
+function failureSpecificMessageFor(
+  block,
+) {
+  const lines =
+    block.split("\n");
+
+  const errorHeaderIndexes = [];
+
+  for (
+    let index = 0;
+    index < lines.length;
+    index += 1
+  ) {
+    if (
+      /^  error:/.test(
+        lines[index],
+      )
+    ) {
+      errorHeaderIndexes.push(index);
+    }
+  }
+
+  if (
+    errorHeaderIndexes.length !== 1
+  ) {
+    return null;
+  }
+
+  const headerIndex =
+    errorHeaderIndexes[0];
+
+  const header =
+    lines[headerIndex];
+
+  const quotedMatch =
+    /^  error: ['"]([^'"]+)['"]$/
+      .exec(header);
+
+  if (quotedMatch !== null) {
+    return quotedMatch[1];
+  }
+
+  if (header !== "  error: |-") {
+    return null;
+  }
+
+  const scalarLines = [];
+
+  for (
+    let index = headerIndex + 1;
+    index < lines.length;
+    index += 1
+  ) {
+    const line = lines[index];
+
+    if (
+      /^  [A-Za-z][A-Za-z0-9_]*:/
+        .test(line) ||
+      line === "  ..."
+    ) {
+      break;
+    }
+
+    if (!line.startsWith("    ")) {
+      return null;
+    }
+
+    scalarLines.push(
+      line.slice(4),
+    );
+  }
+
+  if (scalarLines.length === 0) {
+    return null;
+  }
+
+  const message =
+    scalarLines
+      .join("\n")
+      .replace(/\n+$/u, "");
+
+  return message.length === 0
+    ? null
+    : message;
+}
+
+function failureSpecificFragmentsFor(
+  failedTestResult,
+) {
+  const failureType =
+    singleDiagnosticValue(
+      failedTestResult.block,
+      "failureType",
+    );
+
+  if (
+    failureType !==
+      "testCodeFailure"
+  ) {
+    return [];
+  }
+
+  const message =
+    failureSpecificMessageFor(
+      failedTestResult.block,
+    );
+
+  if (
+    message === null ||
+    message === "test failed" ||
+    containsUnsafeFailureSpecificContent(
+      message,
+    )
+  ) {
+    return [];
+  }
+
+  return [message];
+}
+
+function inspectionStructuralStatus(
+  executionResult,
+  evidence,
+) {
+  if (executionResult.timedOut) {
+    return "EXECUTION_TIMEOUT";
+  }
+
+  if (
+    executionResult.processErrorCode !==
+      null
+  ) {
+    return "PROCESS_ERROR";
+  }
+
+  if (executionResult.signal !== null) {
+    return "PROCESS_SIGNAL";
+  }
+
+  if (
+    executionResult.stdoutTruncated ||
+    executionResult.stderrTruncated
+  ) {
+    return "OUTPUT_TRUNCATED";
+  }
+
+  if (evidence.loadFailureObserved) {
+    return "LOAD_FAILURE";
+  }
+
+  if (!evidence.tapVersionPresent) {
+    return "TAP_VERSION_MISSING";
+  }
+
+  if (!evidence.hasCompleteSummary) {
+    return "TAP_SUMMARY_INCOMPLETE";
+  }
+
+  if (!evidence.tapResultStructureValid) {
+    return "TAP_STRUCTURE_INVALID";
+  }
+
+  return "COMPLETE";
+}
+
+function projectFailedLeaf(
+  failedTestResult,
+) {
+  return {
+    testName:
+      failedTestResult.testName,
+
+    failureType:
+      singleDiagnosticValue(
+        failedTestResult.block,
+        "failureType",
+      ),
+
+    code:
+      singleDiagnosticValue(
+        failedTestResult.block,
+        "code",
+      ),
+
+    operator:
+      singleDiagnosticValue(
+        failedTestResult.block,
+        "operator",
+      ),
+
+    failureSpecificFragments:
+      failureSpecificFragmentsFor(
+        failedTestResult,
+      ),
+  };
+}
+
+/**
+ * Read-only projection over the same structural node:test evidence
+ * consumed by the production classifiers.
+ *
+ * No expected count, expected-failure matching, production outcome,
+ * or Change Proof verdict is applied here.
+ */
+export function inspectNodeTestEvidence(
+  executionResult,
+) {
+  validateExecutionResult(
+    executionResult,
+  );
+
+  const evidence =
+    collectNodeTestEvidence(
+      executionResult,
+    );
+
+  const structuralStatus =
+    inspectionStructuralStatus(
+      executionResult,
+      evidence,
+    );
+
+  return {
+    framework: "node:test",
+
+    structuralStatus,
+
+    observedTestCount:
+      Number.isSafeInteger(
+        evidence.summary.tests,
+      )
+        ? evidence.summary.tests
+        : null,
+
+    summary: {
+      tests: evidence.summary.tests,
+      pass: evidence.summary.pass,
+      fail: evidence.summary.fail,
+      cancelled:
+        evidence.summary.cancelled,
+      skipped:
+        evidence.summary.skipped,
+      todo: evidence.summary.todo,
+    },
+
+    failedLeaves:
+      structuralStatus === "COMPLETE"
+        ? evidence.failedTestResults.map(
+            projectFailedLeaf,
+          )
+        : [],
   };
 }
 
@@ -896,6 +1163,18 @@ export function classifyNodeTestExecution(
       executionResult,
     );
 
+  return classifyNodeTestExecutionFromEvidence({
+    executionResult,
+    expectedTestCount,
+    evidence,
+  });
+}
+
+function classifyNodeTestExecutionFromEvidence({
+  executionResult,
+  expectedTestCount,
+  evidence,
+}) {
   const common = {
     tapVersionPresent:
       evidence.tapVersionPresent,
@@ -1422,10 +1701,24 @@ export function classifyExpectedNodeTestRegression(
   const expectedFailures =
     normalizeExpectedFailures(input);
 
+  validateExecutionResult(
+    executionResult,
+  );
+
+  requireExpectedTestCount(
+    expectedTestCount,
+  );
+
+  const evidence =
+    collectNodeTestEvidence(
+      executionResult,
+    );
+
   const classification =
-    classifyNodeTestExecution({
+    classifyNodeTestExecutionFromEvidence({
       executionResult,
       expectedTestCount,
+      evidence,
     });
 
   if (
@@ -1445,11 +1738,6 @@ export function classifyExpectedNodeTestRegression(
   ) {
     return classification;
   }
-
-  const evidence =
-    collectNodeTestEvidence(
-      executionResult,
-    );
 
   const actualFailures =
     evidence.failedTestResults;
