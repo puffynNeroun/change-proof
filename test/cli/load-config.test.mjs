@@ -656,10 +656,10 @@ test(
       item.config.expectationProvenance,
     );
 
-    assert.equal(
-      "expectationProvenance" in
-        loaded.orchestratorInput,
-      false,
+    assert.deepEqual(
+      loaded.orchestratorInput
+        .expectationProvenance,
+      item.config.expectationProvenance,
     );
   },
 );
