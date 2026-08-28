@@ -29,6 +29,7 @@ function sampleReport() {
   return {
     schemaVersion: "0.1",
     toolVersion: "test-version",
+expectationProvenance: null,
     repository: {
       baseCommitId,
       headCommitId,
@@ -283,3 +284,115 @@ test("rejects raw stdout and stderr fields", async (suite) => {
     });
   }
 });
+
+function promotedProvenance() {
+  return {
+    source:
+      "change-proof.prepare-candidate",
+    candidateSha256:
+      "11".repeat(32),
+    candidateContractVersion:
+      "0.1",
+    prepareToolVersion:
+      "0.1.0-beta.1",
+    prepareConfigSha256:
+      "22".repeat(32),
+    repositoryContextSha256:
+      "33".repeat(32),
+    resolvedCommits: {
+      base: "a".repeat(40),
+      head: "b".repeat(40),
+    },
+    executionContractSha256:
+      "44".repeat(32),
+    envelopeSha256:
+      "55".repeat(32),
+    failureSetSha256:
+      "66".repeat(32),
+    runtimeVerified: true,
+  };
+}
+
+test(
+  "renders explicit manual preregistration provenance mode",
+  () => {
+    const markdown =
+      renderEvidenceReportMarkdown(
+        sampleReport(),
+      );
+
+    assert.match(
+      markdown,
+      /## Expectation Provenance/u,
+    );
+
+    assert.match(
+      markdown,
+      /Mode: manual preregistration\./u,
+    );
+
+    assert.match(
+      markdown,
+      /Runtime provenance verification: not applicable\./u,
+    );
+  },
+);
+
+test(
+  "renders verified promoted expectation provenance",
+  () => {
+    const report = sampleReport();
+
+    report.expectationProvenance =
+      promotedProvenance();
+
+    const markdown =
+      renderEvidenceReportMarkdown(
+        report,
+      );
+
+    for (const value of [
+      "Mode: promoted prepare candidate.",
+      "Runtime provenance verification: VERIFIED.",
+      report.expectationProvenance
+        .candidateSha256,
+      report.expectationProvenance
+        .prepareConfigSha256,
+      report.expectationProvenance
+        .repositoryContextSha256,
+      report.expectationProvenance
+        .executionContractSha256,
+      report.expectationProvenance
+        .envelopeSha256,
+      report.expectationProvenance
+        .failureSetSha256,
+    ]) {
+      assert.equal(
+        markdown.includes(value),
+        true,
+        value,
+      );
+    }
+  },
+);
+
+test(
+  "rejects unverified promoted provenance",
+  () => {
+    const report = sampleReport();
+
+    report.expectationProvenance =
+      promotedProvenance();
+
+    report.expectationProvenance
+      .runtimeVerified = false;
+
+    assert.throws(
+      () =>
+        renderEvidenceReportMarkdown(
+          report,
+        ),
+      /invalid_evidence_report:expectationProvenance\.runtimeVerified/u,
+    );
+  },
+);

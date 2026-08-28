@@ -566,6 +566,9 @@ export async function runChangeProof(input) {
     await primitives.resolveRepositoryRoot(
       normalized.repositoryRoot,
     );
+
+  let expectationProvenanceVerification =
+    null;
   const baseCommitId = await primitives.resolveCommit(
     repositoryRoot,
     normalized.baseRef,
@@ -584,7 +587,8 @@ export async function runChangeProof(input) {
         repositoryRoot,
       );
 
-    verifyExpectationProvenance({
+    expectationProvenanceVerification =
+      verifyExpectationProvenance({
       expectationProvenance:
         normalized.expectationProvenance,
 
@@ -793,6 +797,24 @@ export async function runChangeProof(input) {
   const evidence = lifecycleResult.value;
   const report = buildEvidenceReport({
     toolVersion: normalized.toolVersion,
+
+    expectationProvenance:
+      normalized.expectationProvenance === null
+        ? null
+        : {
+            ...normalized.expectationProvenance,
+
+            resolvedCommits: {
+              ...normalized
+                .expectationProvenance
+                .resolvedCommits,
+            },
+
+            runtimeVerified:
+              expectationProvenanceVerification
+                ?.verified === true,
+          },
+
     repository: {
       baseRef: normalized.baseRef,
       headRef: normalized.headRef,

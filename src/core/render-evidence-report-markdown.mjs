@@ -131,11 +131,76 @@ function validateState(name, state) {
   }
 }
 
+function validateExpectationProvenance(value) {
+  if (value === null) {
+    return;
+  }
+
+  requireRecord(
+    "expectationProvenance",
+    value,
+  );
+
+  for (const field of [
+    "source",
+    "candidateSha256",
+    "candidateContractVersion",
+    "prepareToolVersion",
+    "prepareConfigSha256",
+    "repositoryContextSha256",
+    "executionContractSha256",
+    "envelopeSha256",
+    "failureSetSha256",
+  ]) {
+    requireString(
+      `expectationProvenance.${field}`,
+      value[field],
+    );
+  }
+
+  requireRecord(
+    "expectationProvenance.resolvedCommits",
+    value.resolvedCommits,
+  );
+
+  requireString(
+    "expectationProvenance.resolvedCommits.base",
+    value.resolvedCommits.base,
+  );
+
+  requireString(
+    "expectationProvenance.resolvedCommits.head",
+    value.resolvedCommits.head,
+  );
+
+  if (value.runtimeVerified !== true) {
+    invalidReport(
+      "expectationProvenance.runtimeVerified",
+    );
+  }
+}
+
 function validateReport(report) {
   requireRecord("report", report);
   rejectRawOutputFields(report);
   requireString("schemaVersion", report.schemaVersion);
   requireString("toolVersion", report.toolVersion);
+
+  if (
+    !Object.hasOwn(
+      report,
+      "expectationProvenance",
+    )
+  ) {
+    invalidReport(
+      "expectationProvenance",
+    );
+  }
+
+  validateExpectationProvenance(
+    report.expectationProvenance,
+  );
+
   requireString("verdict", report.verdict);
   requireStringArray("reasons", report.reasons);
   requireStringArray("limitations", report.limitations);
@@ -317,6 +382,38 @@ export function renderEvidenceReportMarkdown(report) {
 
   lines.push("## Reasons", "");
   appendStringList(lines, report.reasons);
+
+  lines.push(
+    "",
+    "## Expectation Provenance",
+    "",
+  );
+
+  if (
+    report.expectationProvenance === null
+  ) {
+    lines.push(
+      "- Mode: manual preregistration.",
+      "- Runtime provenance verification: not applicable.",
+    );
+  } else {
+    lines.push(
+      "- Mode: promoted prepare candidate.",
+      "- Runtime provenance verification: VERIFIED.",
+      `- Source: ${inlineCode(report.expectationProvenance.source)}`,
+      `- Candidate SHA-256: ${inlineCode(report.expectationProvenance.candidateSha256)}`,
+      `- Prepare config SHA-256: ${inlineCode(report.expectationProvenance.prepareConfigSha256)}`,
+      `- Prepare tool version: ${inlineCode(report.expectationProvenance.prepareToolVersion)}`,
+      `- Candidate contract version: ${inlineCode(report.expectationProvenance.candidateContractVersion)}`,
+      `- Repository context SHA-256: ${inlineCode(report.expectationProvenance.repositoryContextSha256)}`,
+      `- Resolved base: ${inlineCode(report.expectationProvenance.resolvedCommits.base)}`,
+      `- Resolved head: ${inlineCode(report.expectationProvenance.resolvedCommits.head)}`,
+      `- Execution contract SHA-256: ${inlineCode(report.expectationProvenance.executionContractSha256)}`,
+      `- Envelope SHA-256: ${inlineCode(report.expectationProvenance.envelopeSha256)}`,
+      `- Failure set SHA-256: ${inlineCode(report.expectationProvenance.failureSetSha256)}`,
+    );
+  }
+
   lines.push(
     "",
     "## Immutable Repository States",

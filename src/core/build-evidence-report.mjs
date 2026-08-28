@@ -217,6 +217,7 @@ export function buildEvidenceReport(input = {}) {
       EVIDENCE_REPORT_SCHEMA_VERSION,
 
     toolVersion,
+    expectationProvenance = null,
     repository,
     command,
     envelope,
@@ -258,6 +259,14 @@ export function buildEvidenceReport(input = {}) {
   const report = {
     schemaVersion,
     toolVersion,
+
+    expectationProvenance:
+      expectationProvenance === null
+        ? null
+        : cloneReportSection(
+            "expectationProvenance",
+            expectationProvenance,
+          ),
 
     repository:
       cloneReportSection(
