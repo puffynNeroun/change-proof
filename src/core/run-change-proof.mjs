@@ -35,6 +35,9 @@ import {
 import {
   runBoundedCommand,
 } from "./run-bounded-command.mjs";
+import {
+  verifyExpectationProvenance,
+} from "./verify-expectation-provenance.mjs";
 
 const GIT_EXECUTABLE = "git";
 
@@ -297,6 +300,9 @@ function normalizeInput(input) {
         ),
       },
     },
+    expectationProvenance:
+      input.expectationProvenance ?? null,
+
     toolVersion: requireString(
       "toolVersion",
       input.toolVersion,
@@ -568,6 +574,44 @@ export async function runChangeProof(input) {
     repositoryRoot,
     normalized.headRef,
   );
+
+  if (
+    normalized.expectationProvenance !==
+      null
+  ) {
+    const gitCommonDirRealpath =
+      await primitives.resolveGitCommonDir(
+        repositoryRoot,
+      );
+
+    verifyExpectationProvenance({
+      expectationProvenance:
+        normalized.expectationProvenance,
+
+      repositoryRootRealpath:
+        repositoryRoot,
+
+      gitCommonDirRealpath,
+
+      resolvedCommits: {
+        base: baseCommitId,
+        head: headCommitId,
+      },
+
+      command:
+        normalized.command,
+
+      envelope:
+        normalized.envelope,
+
+      expectedFailures:
+        normalized
+          .classification
+          .stateC
+          .expectedFailures,
+    });
+  }
+
   const changedPaths = await primitives.listChangedPaths(
     repositoryRoot,
     baseCommitId,

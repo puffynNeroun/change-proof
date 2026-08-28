@@ -664,6 +664,19 @@ export async function loadChangeProofConfig(configPath) {
               })),
         },
       },
+      expectationProvenance:
+        normalized.expectationProvenance === null
+          ? null
+          : {
+              ...normalized.expectationProvenance,
+
+              resolvedCommits: {
+                ...normalized
+                  .expectationProvenance
+                  .resolvedCommits,
+              },
+            },
+
       toolVersion: packageMetadata.version,
       temporaryParentDirectory,
       workspacePrefix: normalized.workspacePrefix,
