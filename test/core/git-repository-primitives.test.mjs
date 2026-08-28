@@ -1168,3 +1168,708 @@ test(
     );
   },
 );
+
+const {
+  after: task5CommonDirAfter,
+  test: task5CommonDirTest,
+} = await import("node:test");
+
+const task5CommonDirAssert = (
+  await import("node:assert/strict")
+).default;
+
+const {
+  chmod: task5CommonDirChmod,
+  lstat: task5CommonDirLstat,
+  mkdir: task5CommonDirMkdir,
+  mkdtemp: task5CommonDirMkdtemp,
+  realpath: task5CommonDirRealpath,
+  rm: task5CommonDirRm,
+  writeFile: task5CommonDirWriteFile,
+} = await import("node:fs/promises");
+
+const {
+  isAbsolute: task5CommonDirIsAbsolute,
+  join: task5CommonDirJoin,
+  resolve: task5CommonDirResolve,
+} = await import("node:path");
+
+const {
+  tmpdir: task5CommonDirTmpdir,
+} = await import("node:os");
+
+const {
+  spawnSync: task5CommonDirSpawnSync,
+} = await import("node:child_process");
+
+const {
+  createGitRepositoryPrimitives:
+    task5CreateGitRepositoryPrimitives,
+  GitPrimitiveError:
+    Task5GitPrimitiveError,
+} = await import(
+  "../../src/core/git-repository-primitives.mjs"
+);
+
+const task5CommonDirRoot =
+  await task5CommonDirMkdtemp(
+    task5CommonDirJoin(
+      task5CommonDirTmpdir(),
+      "change-proof-common-dir-",
+    ),
+  );
+
+task5CommonDirAfter(
+  async () => {
+    await task5CommonDirRm(
+      task5CommonDirRoot,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
+  },
+);
+
+function task5CommonDirGit(
+  cwd,
+  argumentsList,
+) {
+  const result =
+    task5CommonDirSpawnSync(
+      "git",
+      argumentsList,
+      {
+        cwd,
+        encoding: "utf8",
+      },
+    );
+
+  if (result.status !== 0) {
+    throw new Error(
+      [
+        `git ${argumentsList.join(" ")} failed`,
+        result.stdout,
+        result.stderr,
+      ].join("\n"),
+    );
+  }
+
+  return result.stdout;
+}
+
+function task5CommonDirConfiguration(
+  overrides = {},
+) {
+  return {
+    gitExecutable:
+      "git",
+
+    environment:
+      Object.fromEntries(
+        Object.entries(
+          process.env,
+        ).filter(
+          ([, value]) =>
+            typeof value === "string",
+        ),
+      ),
+
+    timeoutMs:
+      30_000,
+
+    maxStdoutBytes:
+      4 * 1024 * 1024,
+
+    maxStderrBytes:
+      4 * 1024 * 1024,
+
+    ...overrides,
+  };
+}
+
+async function task5CreateRepository(
+  name,
+) {
+  const repository =
+    task5CommonDirJoin(
+      task5CommonDirRoot,
+      name,
+    );
+
+  await task5CommonDirMkdir(
+    repository,
+    {
+      recursive: true,
+    },
+  );
+
+  task5CommonDirGit(
+    repository,
+    [
+      "init",
+      "-q",
+    ],
+  );
+
+  task5CommonDirGit(
+    repository,
+    [
+      "config",
+      "user.email",
+      "task5@example.invalid",
+    ],
+  );
+
+  task5CommonDirGit(
+    repository,
+    [
+      "config",
+      "user.name",
+      "Task Five",
+    ],
+  );
+
+  await task5CommonDirWriteFile(
+    task5CommonDirJoin(
+      repository,
+      "tracked.txt",
+    ),
+    "base\n",
+  );
+
+  task5CommonDirGit(
+    repository,
+    [
+      "add",
+      "--",
+      "tracked.txt",
+    ],
+  );
+
+  task5CommonDirGit(
+    repository,
+    [
+      "commit",
+      "-q",
+      "-m",
+      "base",
+    ],
+  );
+
+  return repository;
+}
+
+async function task5ExpectedCommonDir(
+  repositoryRoot,
+) {
+  const raw =
+    task5CommonDirGit(
+      repositoryRoot,
+      [
+        "rev-parse",
+        "--git-common-dir",
+      ],
+    ).replace(
+      /\r?\n$/,
+      "",
+    );
+
+  const candidate =
+    task5CommonDirIsAbsolute(raw)
+      ? raw
+      : task5CommonDirResolve(
+          repositoryRoot,
+          raw,
+        );
+
+  return task5CommonDirRealpath(
+    candidate,
+  );
+}
+
+task5CommonDirTest(
+  "resolveGitCommonDir returns canonical absolute common dir for ordinary primary repository",
+  async () => {
+    const repository =
+      await task5CreateRepository(
+        "ordinary",
+      );
+
+    const primitives =
+      task5CreateGitRepositoryPrimitives(
+        task5CommonDirConfiguration(),
+      );
+
+    const repositoryRoot =
+      await primitives
+        .resolveRepositoryRoot(
+          repository,
+        );
+
+    const actual =
+      await primitives
+        .resolveGitCommonDir(
+          repositoryRoot,
+        );
+
+    const expected =
+      await task5ExpectedCommonDir(
+        repositoryRoot,
+      );
+
+    task5CommonDirAssert.equal(
+      actual,
+      expected,
+    );
+
+    task5CommonDirAssert.equal(
+      task5CommonDirIsAbsolute(
+        actual,
+      ),
+      true,
+    );
+
+    task5CommonDirAssert.equal(
+      actual,
+      await task5CommonDirRealpath(
+        actual,
+      ),
+    );
+
+    task5CommonDirAssert.equal(
+      (
+        await task5CommonDirLstat(
+          actual,
+        )
+      ).isDirectory(),
+      true,
+    );
+  },
+);
+
+task5CommonDirTest(
+  "linked worktree returns shared repository common dir not per-worktree admin dir",
+  async () => {
+    const repository =
+      await task5CreateRepository(
+        "linked-source",
+      );
+
+    const linked =
+      task5CommonDirJoin(
+        task5CommonDirRoot,
+        "linked-worktree",
+      );
+
+    task5CommonDirGit(
+      repository,
+      [
+        "worktree",
+        "add",
+        "--detach",
+        linked,
+        "HEAD",
+      ],
+    );
+
+    try {
+      const primitives =
+        task5CreateGitRepositoryPrimitives(
+          task5CommonDirConfiguration(),
+        );
+
+      const actual =
+        await primitives
+          .resolveGitCommonDir(
+            linked,
+          );
+
+      const expected =
+        await task5ExpectedCommonDir(
+          linked,
+        );
+
+      const primaryCommon =
+        await task5CommonDirRealpath(
+          task5CommonDirJoin(
+            repository,
+            ".git",
+          ),
+        );
+
+      const rawAdmin =
+        task5CommonDirGit(
+          linked,
+          [
+            "rev-parse",
+            "--git-dir",
+          ],
+        ).replace(
+          /\r?\n$/,
+          "",
+        );
+
+      const adminPath =
+        task5CommonDirIsAbsolute(
+          rawAdmin,
+        )
+          ? rawAdmin
+          : task5CommonDirResolve(
+              linked,
+              rawAdmin,
+            );
+
+      const adminRealpath =
+        await task5CommonDirRealpath(
+          adminPath,
+        );
+
+      task5CommonDirAssert.equal(
+        actual,
+        expected,
+      );
+
+      task5CommonDirAssert.equal(
+        actual,
+        primaryCommon,
+      );
+
+      task5CommonDirAssert.notEqual(
+        actual,
+        adminRealpath,
+      );
+    } finally {
+      task5CommonDirGit(
+        repository,
+        [
+          "worktree",
+          "remove",
+          "--force",
+          linked,
+        ],
+      );
+    }
+  },
+);
+
+task5CommonDirTest(
+  "resolveGitCommonDir fails closed for malformed output and operational Git failures",
+  async (suite) => {
+    const repository =
+      await task5CreateRepository(
+        "failure-source",
+      );
+
+    await task5CommonDirWriteFile(
+      task5CommonDirJoin(
+        repository,
+        "not-a-directory",
+      ),
+      "file\n",
+    );
+
+    const fakeGit =
+      task5CommonDirJoin(
+        task5CommonDirRoot,
+        "fake-git.mjs",
+      );
+
+    await task5CommonDirWriteFile(
+      fakeGit,
+      `#!/usr/bin/env node
+const mode =
+  process.env.TASK5_COMMON_DIR_MODE;
+
+if (mode === "empty") {
+  process.exit(0);
+}
+
+if (mode === "multiple") {
+  process.stdout.write(
+    "one\\ntwo\\n",
+  );
+  process.exit(0);
+}
+
+if (mode === "nul") {
+  process.stdout.write(
+    "one\\u0000two\\n",
+  );
+  process.exit(0);
+}
+
+if (mode === "file") {
+  process.stdout.write(
+    "not-a-directory\\n",
+  );
+  process.exit(0);
+}
+
+if (mode === "nonzero") {
+  process.stderr.write(
+    "injected failure\\n",
+  );
+  process.exit(7);
+}
+
+if (mode === "signal") {
+  process.kill(
+    process.pid,
+    "SIGTERM",
+  );
+  return;
+}
+
+if (mode === "timeout") {
+  setTimeout(
+    () => {},
+    10_000,
+  );
+  return;
+}
+
+if (mode === "stdout-truncated") {
+  process.stdout.write(
+    "x".repeat(16_384),
+  );
+  process.exit(0);
+}
+
+if (mode === "stderr-truncated") {
+  process.stderr.write(
+    "x".repeat(16_384),
+  );
+  process.exit(7);
+}
+
+process.stdout.write(
+  ".git\\n",
+);
+`,
+    );
+
+    await task5CommonDirChmod(
+      fakeGit,
+      0o700,
+    );
+
+    for (const mode of [
+      "empty",
+      "multiple",
+      "nul",
+      "file",
+      "nonzero",
+      "signal",
+      "timeout",
+      "stdout-truncated",
+      "stderr-truncated",
+    ]) {
+      await suite.test(
+        mode,
+        async () => {
+          const base =
+            task5CommonDirConfiguration();
+
+          const primitives =
+            task5CreateGitRepositoryPrimitives({
+              ...base,
+
+              gitExecutable:
+                fakeGit,
+
+              environment: {
+                ...base.environment,
+
+                TASK5_COMMON_DIR_MODE:
+                  mode,
+              },
+
+              timeoutMs:
+                mode === "timeout"
+                  ? 40
+                  : base.timeoutMs,
+
+              maxStdoutBytes:
+                mode ===
+                  "stdout-truncated"
+                    ? 64
+                    : base
+                        .maxStdoutBytes,
+
+              maxStderrBytes:
+                mode ===
+                  "stderr-truncated"
+                    ? 64
+                    : base
+                        .maxStderrBytes,
+            });
+
+          await task5CommonDirAssert.rejects(
+            () =>
+              primitives
+                .resolveGitCommonDir(
+                  repository,
+                ),
+            (error) =>
+              error instanceof
+                Task5GitPrimitiveError,
+          );
+        },
+      );
+    }
+  },
+);
+
+task5CommonDirTest(
+  "missing Git executable preserves existing primitive process-error code",
+  async () => {
+    const repository =
+      await task5CreateRepository(
+        "missing-executable",
+      );
+
+    const missingGit =
+      task5CommonDirJoin(
+        task5CommonDirRoot,
+        "definitely-missing-git",
+      );
+
+    const primitives =
+      task5CreateGitRepositoryPrimitives(
+        task5CommonDirConfiguration({
+          gitExecutable:
+            missingGit,
+        }),
+      );
+
+    let existingError;
+    let commonDirError;
+
+    try {
+      await primitives
+        .resolveRepositoryRoot(
+          repository,
+        );
+
+      task5CommonDirAssert.fail(
+        "expected repository-root failure",
+      );
+    } catch (error) {
+      existingError =
+        error;
+    }
+
+    try {
+      await primitives
+        .resolveGitCommonDir(
+          repository,
+        );
+
+      task5CommonDirAssert.fail(
+        "expected common-dir failure",
+      );
+    } catch (error) {
+      commonDirError =
+        error;
+    }
+
+    task5CommonDirAssert.equal(
+      existingError instanceof
+        Task5GitPrimitiveError,
+      true,
+    );
+
+    task5CommonDirAssert.equal(
+      commonDirError instanceof
+        Task5GitPrimitiveError,
+      true,
+    );
+
+    task5CommonDirAssert.equal(
+      commonDirError.code,
+      existingError.code,
+    );
+  },
+);
+
+task5CommonDirTest(
+  "resolveGitCommonDir reuses existing runGit and introduces no shell second runner or remote command",
+  async () => {
+    const {
+      readFile,
+    } =
+      await import(
+        "node:fs/promises"
+      );
+
+    const source =
+      await readFile(
+        new URL(
+          "../../src/core/git-repository-primitives.mjs",
+          import.meta.url,
+        ),
+        "utf8",
+      );
+
+    const start =
+      source.indexOf(
+        "async function resolveGitCommonDir(",
+      );
+
+    task5CommonDirAssert.notEqual(
+      start,
+      -1,
+    );
+
+    const next =
+      source.indexOf(
+        "\n  async function ",
+        start + 1,
+      );
+
+    const implementation =
+      source.slice(
+        start,
+        next === -1
+          ? source.length
+          : next,
+      );
+
+    task5CommonDirAssert.equal(
+      implementation.includes(
+        "runGit(",
+      ),
+      true,
+    );
+
+    task5CommonDirAssert.equal(
+      implementation.includes(
+        "parseSingleLine(",
+      ),
+      true,
+    );
+
+    for (const forbidden of [
+      "runBoundedCommand(",
+      "spawn(",
+      "spawnSync(",
+      "exec(",
+      "execFile(",
+      "shell:",
+      '"fetch"',
+      '"push"',
+      '"pull"',
+      '"remote"',
+      '"clone"',
+    ]) {
+      task5CommonDirAssert.equal(
+        implementation.includes(
+          forbidden,
+        ),
+        false,
+        forbidden,
+      );
+    }
+  },
+);

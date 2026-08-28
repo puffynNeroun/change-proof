@@ -1,7 +1,6 @@
-import { constants } from "node:fs";
+import { createStrictJsonFilePrimitives } from "./strict-json-file.mjs";
 import {
   lstat,
-  open,
   realpath,
   stat,
 } from "node:fs/promises";
@@ -39,100 +38,42 @@ function fail(code, cause) {
   throw configError(code, cause);
 }
 
-function isPlainObject(value) {
-  if (
-    value === null ||
-    typeof value !== "object" ||
-    Array.isArray(value)
-  ) {
-    return false;
-  }
-
-  const prototype = Object.getPrototypeOf(value);
-  return (
-    prototype === Object.prototype ||
-    prototype === null
-  );
-}
-
-function scanParsedValue(value) {
-  if (typeof value === "string") {
-    if (value.includes("\0")) {
-      fail("CONFIG_FIELD_INVALID");
-    }
-    return;
-  }
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      scanParsedValue(item);
-    }
-    return;
-  }
-
-  if (value !== null && typeof value === "object") {
-    for (const key of Object.keys(value)) {
-      if (SPECIAL_KEYS.has(key)) {
-        fail("CONFIG_UNKNOWN_KEY");
-      }
-      scanParsedValue(value[key]);
-    }
-  }
-}
-
-function requireObject(value, allowedKeys) {
-  if (!isPlainObject(value)) {
-    fail("CONFIG_FIELD_INVALID");
-  }
-
-  const allowed = new Set(allowedKeys);
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) {
-      fail("CONFIG_UNKNOWN_KEY");
-    }
-  }
-
-  for (const key of allowedKeys) {
-    if (!Object.hasOwn(value, key)) {
-      fail("CONFIG_REQUIRED_FIELD_MISSING");
-    }
-  }
-
-  return value;
-}
-
-function requireString(value) {
-  if (
-    typeof value !== "string" ||
-    value.length === 0 ||
-    value.includes("\0")
-  ) {
-    fail("CONFIG_FIELD_INVALID");
-  }
-  return value;
-}
-
-function requireStringArray(value, { nonEmpty = false } = {}) {
-  if (
-    !Array.isArray(value) ||
-    (nonEmpty && value.length === 0)
-  ) {
-    fail("CONFIG_FIELD_INVALID");
-  }
-
-  return value.map((item) => requireString(item));
-}
-
-function requirePositiveInteger(value) {
-  if (
-    !Number.isSafeInteger(value) ||
-    value < 1 ||
-    value > 2_147_483_647
-  ) {
-    fail("CONFIG_FIELD_INVALID");
-  }
-  return value;
-}
+const {
+  isPlainObject,
+  scanParsedValue,
+  requireObject,
+  requireString,
+  requireStringArray,
+  requirePositiveInteger,
+  readConfigFile,
+  parseConfigBytes,
+} = createStrictJsonFilePrimitives({
+  fail,
+  maxBytes: MAX_CONFIG_BYTES,
+  dangerousKeys: SPECIAL_KEYS,
+  codes: {
+    fieldInvalid:
+      "CONFIG_FIELD_INVALID",
+    unknownKey:
+      "CONFIG_UNKNOWN_KEY",
+    requiredFieldMissing:
+      "CONFIG_REQUIRED_FIELD_MISSING",
+    fileNotFound:
+      "CONFIG_FILE_NOT_FOUND",
+    fileReadFailed:
+      "CONFIG_FILE_READ_FAILED",
+    fileSymlink:
+      "CONFIG_FILE_SYMLINK",
+    fileNotRegular:
+      "CONFIG_FILE_NOT_REGULAR",
+    fileTooLarge:
+      "CONFIG_FILE_TOO_LARGE",
+    jsonInvalid:
+      "CONFIG_JSON_INVALID",
+  },
+  isMappedError: (error) =>
+    error instanceof ChangeProofConfigError,
+});
 
 function requireExpectedCount(value) {
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -338,98 +279,6 @@ async function normalizeOutputDirectory(
     return canonicalParent;
   }
   return absolutePath;
-}
-
-async function readConfigFile(configPath) {
-  let metadata;
-  try {
-    metadata = await lstat(configPath);
-  } catch (error) {
-    if (error?.code === "ENOENT") {
-      fail("CONFIG_FILE_NOT_FOUND", error);
-    }
-    fail("CONFIG_FILE_READ_FAILED", error);
-  }
-
-  if (metadata.isSymbolicLink()) {
-    fail("CONFIG_FILE_SYMLINK");
-  }
-  if (!metadata.isFile()) {
-    fail("CONFIG_FILE_NOT_REGULAR");
-  }
-  if (metadata.size > MAX_CONFIG_BYTES) {
-    fail("CONFIG_FILE_TOO_LARGE");
-  }
-
-  let handle;
-  try {
-    handle = await open(
-      configPath,
-      constants.O_RDONLY | constants.O_NOFOLLOW,
-    );
-    const openedMetadata = await handle.stat();
-    if (!openedMetadata.isFile()) {
-      fail("CONFIG_FILE_NOT_REGULAR");
-    }
-    if (openedMetadata.size > MAX_CONFIG_BYTES) {
-      fail("CONFIG_FILE_TOO_LARGE");
-    }
-    return await handle.readFile();
-  } catch (error) {
-    if (error instanceof ChangeProofConfigError) {
-      throw error;
-    }
-    if (error?.code === "ELOOP") {
-      fail("CONFIG_FILE_SYMLINK", error);
-    }
-    fail("CONFIG_FILE_READ_FAILED", error);
-  } finally {
-    if (handle !== undefined) {
-      try {
-        await handle.close();
-      } catch {
-        // A failed close cannot make successfully read bytes trustworthy.
-        fail("CONFIG_FILE_READ_FAILED");
-      }
-    }
-  }
-}
-
-function parseConfigBytes(bytes) {
-  let offset = 0;
-  const hasBom = (
-    bytes.length >= 3 &&
-    bytes[0] === 0xef &&
-    bytes[1] === 0xbb &&
-    bytes[2] === 0xbf
-  );
-  if (hasBom) {
-    offset = 3;
-    if (
-      bytes.length >= 6 &&
-      bytes[3] === 0xef &&
-      bytes[4] === 0xbb &&
-      bytes[5] === 0xbf
-    ) {
-      fail("CONFIG_JSON_INVALID");
-    }
-  }
-
-  let text;
-  try {
-    text = new TextDecoder("utf-8", {
-      fatal: true,
-      ignoreBOM: true,
-    }).decode(bytes.subarray(offset));
-  } catch (error) {
-    fail("CONFIG_JSON_INVALID", error);
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    fail("CONFIG_JSON_INVALID", error);
-  }
 }
 
 function normalizeSchema(config) {

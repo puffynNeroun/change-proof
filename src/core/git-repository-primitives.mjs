@@ -1,4 +1,14 @@
 import {
+  lstat as lstatGitCommonDir,
+  realpath as realpathGitCommonDir,
+} from "node:fs/promises";
+
+import {
+  isAbsolute as isAbsoluteGitCommonDir,
+  resolve as resolveGitCommonDirPath,
+} from "node:path";
+
+import {
   runBoundedCommand,
 } from "./run-bounded-command.mjs";
 
@@ -506,6 +516,86 @@ export function createGitRepositoryPrimitives(
     );
   }
 
+  async function resolveGitCommonDir(
+    repositoryRoot,
+  ) {
+    requireString(
+      "repositoryRoot",
+      repositoryRoot,
+    );
+
+    const output =
+      await runGit(
+        repositoryRoot,
+        [
+          "rev-parse",
+          "--git-common-dir",
+        ],
+        "resolve_git_common_dir",
+        GIT_PRIMITIVE_ERROR_CODES
+          .REPOSITORY_ROOT_FAILED,
+      );
+
+    const commonDirOutput =
+      parseSingleLine(
+        output,
+        "resolve_git_common_dir",
+      );
+
+    if (
+      commonDirOutput.includes("\0")
+    ) {
+      throw new GitPrimitiveError(
+        GIT_PRIMITIVE_ERROR_CODES
+          .MALFORMED_OUTPUT,
+        "resolve_git_common_dir",
+      );
+    }
+
+    const commonDirPath =
+      isAbsoluteGitCommonDir(
+        commonDirOutput,
+      )
+        ? commonDirOutput
+        : resolveGitCommonDirPath(
+            repositoryRoot,
+            commonDirOutput,
+          );
+
+    let commonDirRealpath;
+    let commonDirMetadata;
+
+    try {
+      commonDirRealpath =
+        await realpathGitCommonDir(
+          commonDirPath,
+        );
+
+      commonDirMetadata =
+        await lstatGitCommonDir(
+          commonDirRealpath,
+        );
+    } catch {
+      throw new GitPrimitiveError(
+        GIT_PRIMITIVE_ERROR_CODES
+          .MALFORMED_OUTPUT,
+        "resolve_git_common_dir",
+      );
+    }
+
+    if (
+      !commonDirMetadata.isDirectory()
+    ) {
+      throw new GitPrimitiveError(
+        GIT_PRIMITIVE_ERROR_CODES
+          .MALFORMED_OUTPUT,
+        "resolve_git_common_dir",
+      );
+    }
+
+    return commonDirRealpath;
+  }
+
   async function resolveCommit(
     repositoryRoot,
     reference,
@@ -754,6 +844,7 @@ export function createGitRepositoryPrimitives(
 
   return Object.freeze({
     resolveRepositoryRoot,
+    resolveGitCommonDir,
     resolveCommit,
     listChangedPaths,
     readCommitBlobIds,

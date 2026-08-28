@@ -1,3 +1,7 @@
+import {
+  resolveStateWorkingDirectory,
+} from "./resolve-state-working-directory.mjs";
+
 import { realpath } from "node:fs/promises";
 import {
   isAbsolute,
@@ -306,38 +310,6 @@ function normalizeInput(input) {
       input.workspacePrefix,
     ),
   };
-}
-
-function isContained(parent, candidate) {
-  const fromParent = relative(parent, candidate);
-
-  return (
-    fromParent === "" ||
-    (
-      fromParent !== ".." &&
-      !fromParent.startsWith("../") &&
-      !isAbsolute(fromParent)
-    )
-  );
-}
-
-async function resolveStateWorkingDirectory(
-  worktreePath,
-  repositoryRelativeDirectory,
-) {
-  const root = await realpath(worktreePath);
-  const candidate = await realpath(resolve(
-    root,
-    repositoryRelativeDirectory,
-  ));
-
-  if (!isContained(root, candidate)) {
-    throw new Error(
-      "invalid_change_proof_input:command.workingDirectory",
-    );
-  }
-
-  return candidate;
 }
 
 function notRunState(reasonCode) {
