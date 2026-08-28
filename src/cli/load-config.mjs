@@ -281,8 +281,117 @@ async function normalizeOutputDirectory(
   return absolutePath;
 }
 
+function requireSha256(value) {
+  if (
+    typeof value !== "string" ||
+    !/^[0-9a-f]{64}$/u.test(value)
+  ) {
+    fail("CONFIG_FIELD_INVALID");
+  }
+
+  return value;
+}
+
+function normalizeExpectationProvenance(value) {
+  const provenance = requireObject(
+    value,
+    [
+      "source",
+      "candidateSha256",
+      "candidateContractVersion",
+      "prepareToolVersion",
+      "prepareConfigSha256",
+      "repositoryContextSha256",
+      "resolvedCommits",
+      "executionContractSha256",
+      "envelopeSha256",
+      "failureSetSha256",
+    ],
+  );
+
+  if (
+    provenance.source !==
+      "change-proof.prepare-candidate" ||
+    provenance.candidateContractVersion !==
+      "0.1"
+  ) {
+    fail("CONFIG_FIELD_INVALID");
+  }
+
+  const resolvedCommits = requireObject(
+    provenance.resolvedCommits,
+    ["base", "head"],
+  );
+
+  return {
+    source:
+      "change-proof.prepare-candidate",
+
+    candidateSha256:
+      requireSha256(
+        provenance.candidateSha256,
+      ),
+
+    candidateContractVersion:
+      "0.1",
+
+    prepareToolVersion:
+      requireString(
+        provenance.prepareToolVersion,
+      ),
+
+    prepareConfigSha256:
+      requireSha256(
+        provenance.prepareConfigSha256,
+      ),
+
+    repositoryContextSha256:
+      requireSha256(
+        provenance.repositoryContextSha256,
+      ),
+
+    resolvedCommits: {
+      base:
+        requireString(
+          resolvedCommits.base,
+        ),
+
+      head:
+        requireString(
+          resolvedCommits.head,
+        ),
+    },
+
+    executionContractSha256:
+      requireSha256(
+        provenance.executionContractSha256,
+      ),
+
+    envelopeSha256:
+      requireSha256(
+        provenance.envelopeSha256,
+      ),
+
+    failureSetSha256:
+      requireSha256(
+        provenance.failureSetSha256,
+      ),
+  };
+}
+
 function normalizeSchema(config) {
-  requireObject(config, [
+  if (!isPlainObject(config)) {
+    fail("CONFIG_FIELD_INVALID");
+  }
+
+  if (
+    config.schemaVersion !== "0.1" &&
+    config.schemaVersion !== "0.2"
+  ) {
+    fail("CONFIG_SCHEMA_VERSION_UNSUPPORTED");
+  }
+
+  const commonKeys = [
     "schemaVersion",
     "repositoryRoot",
     "baseRef",
@@ -293,11 +402,17 @@ function normalizeSchema(config) {
     "temporaryParentDirectory",
     "workspacePrefix",
     "outputDirectory",
-  ]);
+  ];
 
-  if (config.schemaVersion !== "0.1") {
-    fail("CONFIG_SCHEMA_VERSION_UNSUPPORTED");
-  }
+  requireObject(
+    config,
+    config.schemaVersion === "0.2"
+      ? [
+          ...commonKeys,
+          "expectationProvenance",
+        ]
+      : commonKeys,
+  );
 
   const command = requireObject(config.command, [
     "executable",
@@ -308,21 +423,26 @@ function normalizeSchema(config) {
     "maxStdoutBytes",
     "maxStderrBytes",
   ]);
+
   const envelope = requireObject(config.envelope, [
     "includedPaths",
   ]);
+
   const classification = requireObject(
     config.classification,
     ["stateA", "stateB", "stateC"],
   );
+
   const stateA = requireObject(
     classification.stateA,
     ["expectedTestCount"],
   );
+
   const stateB = requireObject(
     classification.stateB,
     ["expectedTestCount"],
   );
+
   const stateC = requireObject(
     classification.stateC,
     ["expectedTestCount", "expectedFailures"],
@@ -331,6 +451,7 @@ function normalizeSchema(config) {
   const workspacePrefix = requireString(
     config.workspacePrefix,
   );
+
   if (
     workspacePrefix === "." ||
     workspacePrefix === ".." ||
@@ -343,58 +464,102 @@ function normalizeSchema(config) {
   }
 
   return {
-    repositoryRoot: requireString(config.repositoryRoot),
-    baseRef: requireString(config.baseRef),
-    headRef: requireString(config.headRef),
+    schemaVersion:
+      config.schemaVersion,
+
+    repositoryRoot:
+      requireString(config.repositoryRoot),
+
+    baseRef:
+      requireString(config.baseRef),
+
+    headRef:
+      requireString(config.headRef),
+
     command: {
-      executable: requireString(command.executable),
-      arguments: requireStringArray(command.arguments),
-      workingDirectory: normalizeWorkingDirectory(
-        command.workingDirectory,
-      ),
-      environment: normalizeEnvironment(
-        command.environment,
-      ),
-      timeoutMs: requirePositiveInteger(command.timeoutMs),
-      maxStdoutBytes: requirePositiveInteger(
-        command.maxStdoutBytes,
-      ),
-      maxStderrBytes: requirePositiveInteger(
-        command.maxStderrBytes,
-      ),
+      executable:
+        requireString(command.executable),
+
+      arguments:
+        requireStringArray(command.arguments),
+
+      workingDirectory:
+        normalizeWorkingDirectory(
+          command.workingDirectory,
+        ),
+
+      environment:
+        normalizeEnvironment(
+          command.environment,
+        ),
+
+      timeoutMs:
+        requirePositiveInteger(
+          command.timeoutMs,
+        ),
+
+      maxStdoutBytes:
+        requirePositiveInteger(
+          command.maxStdoutBytes,
+        ),
+
+      maxStderrBytes:
+        requirePositiveInteger(
+          command.maxStderrBytes,
+        ),
     },
+
     envelope: {
-      includedPaths: normalizeIncludedPaths(
-        envelope.includedPaths,
-      ),
+      includedPaths:
+        normalizeIncludedPaths(
+          envelope.includedPaths,
+        ),
     },
+
     classification: {
       stateA: {
-        expectedTestCount: requireExpectedCount(
-          stateA.expectedTestCount,
-        ),
+        expectedTestCount:
+          requireExpectedCount(
+            stateA.expectedTestCount,
+          ),
       },
+
       stateB: {
-        expectedTestCount: requireExpectedCount(
-          stateB.expectedTestCount,
-        ),
+        expectedTestCount:
+          requireExpectedCount(
+            stateB.expectedTestCount,
+          ),
       },
+
       stateC: {
-        expectedTestCount: requireExpectedCount(
-          stateC.expectedTestCount,
-        ),
-        expectedFailures: normalizeExpectedFailures(
-          stateC.expectedFailures,
-        ),
+        expectedTestCount:
+          requireExpectedCount(
+            stateC.expectedTestCount,
+          ),
+
+        expectedFailures:
+          normalizeExpectedFailures(
+            stateC.expectedFailures,
+          ),
       },
     },
-    temporaryParentDirectory: requireString(
-      config.temporaryParentDirectory,
-    ),
+
+    expectationProvenance:
+      config.schemaVersion === "0.2"
+        ? normalizeExpectationProvenance(
+            config.expectationProvenance,
+          )
+        : null,
+
+    temporaryParentDirectory:
+      requireString(
+        config.temporaryParentDirectory,
+      ),
+
     workspacePrefix,
-    outputDirectory: requireString(
-      config.outputDirectory,
-    ),
+
+    outputDirectory:
+      requireString(config.outputDirectory),
   };
 }
 
@@ -504,6 +669,20 @@ export async function loadChangeProofConfig(configPath) {
       workspacePrefix: normalized.workspacePrefix,
     },
     outputDirectory,
+
+    expectationProvenance:
+      normalized.expectationProvenance === null
+        ? null
+        : {
+            ...normalized.expectationProvenance,
+
+            resolvedCommits: {
+              ...normalized
+                .expectationProvenance
+                .resolvedCommits,
+            },
+          },
+
     configPath: canonicalConfigPath,
   };
 }

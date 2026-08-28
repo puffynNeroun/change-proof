@@ -593,3 +593,189 @@ test("loads and validates the strict M3 configuration", async (t) => {
     }
   });
 });
+
+function promotedProvenanceFixture() {
+  return {
+    source:
+      "change-proof.prepare-candidate",
+
+    candidateSha256:
+      "11".repeat(32),
+
+    candidateContractVersion:
+      "0.1",
+
+    prepareToolVersion:
+      "0.2.0-beta.2",
+
+    prepareConfigSha256:
+      "22".repeat(32),
+
+    repositoryContextSha256:
+      "33".repeat(32),
+
+    resolvedCommits: {
+      base:
+        "resolved-base-object-id",
+
+      head:
+        "resolved-head-object-id",
+    },
+
+    executionContractSha256:
+      "44".repeat(32),
+
+    envelopeSha256:
+      "55".repeat(32),
+
+    failureSetSha256:
+      "66".repeat(32),
+  };
+}
+
+test(
+  "schema 0.2 requires and preserves strict expectation provenance",
+  async (t) => {
+    const item = await fixture(t);
+
+    item.config.schemaVersion =
+      "0.2";
+
+    item.config.expectationProvenance =
+      promotedProvenanceFixture();
+
+    await item.save();
+
+    const loaded =
+      await loadChangeProofConfig(
+        item.configPath,
+      );
+
+    assert.deepEqual(
+      loaded.expectationProvenance,
+      item.config.expectationProvenance,
+    );
+
+    assert.equal(
+      "expectationProvenance" in
+        loaded.orchestratorInput,
+      false,
+    );
+  },
+);
+
+test(
+  "schema 0.2 without expectation provenance is rejected",
+  async (t) => {
+    const item = await fixture(t);
+
+    item.config.schemaVersion =
+      "0.2";
+
+    await item.save();
+
+    await rejectsCode(
+      loadChangeProofConfig(
+        item.configPath,
+      ),
+      "CONFIG_REQUIRED_FIELD_MISSING",
+    );
+  },
+);
+
+test(
+  "schema 0.1 with expectation provenance is rejected",
+  async (t) => {
+    const item = await fixture(t);
+
+    item.config.expectationProvenance =
+      promotedProvenanceFixture();
+
+    await item.save();
+
+    await rejectsCode(
+      loadChangeProofConfig(
+        item.configPath,
+      ),
+      "CONFIG_UNKNOWN_KEY",
+    );
+  },
+);
+
+test(
+  "schema 0.2 expectation provenance rejects unknown keys",
+  async (t) => {
+    const item = await fixture(t);
+
+    item.config.schemaVersion =
+      "0.2";
+
+    item.config.expectationProvenance = {
+      ...promotedProvenanceFixture(),
+      unexpected:
+        "not allowed",
+    };
+
+    await item.save();
+
+    await rejectsCode(
+      loadChangeProofConfig(
+        item.configPath,
+      ),
+      "CONFIG_UNKNOWN_KEY",
+    );
+  },
+);
+
+test(
+  "schema 0.2 expectation provenance rejects malformed digests",
+  async (t) => {
+    const item = await fixture(t);
+
+    item.config.schemaVersion =
+      "0.2";
+
+    item.config.expectationProvenance =
+      promotedProvenanceFixture();
+
+    item.config
+      .expectationProvenance
+      .failureSetSha256 =
+      "not-a-sha256";
+
+    await item.save();
+
+    await rejectsCode(
+      loadChangeProofConfig(
+        item.configPath,
+      ),
+      "CONFIG_FIELD_INVALID",
+    );
+  },
+);
+
+test(
+  "schema 0.1 remains provenance-free and backwards compatible",
+  async (t) => {
+    const item = await fixture(t);
+
+    const loaded =
+      await loadChangeProofConfig(
+        item.configPath,
+      );
+
+    assert.equal(
+      loaded.expectationProvenance,
+      null,
+    );
+
+    assert.equal(
+      loaded.orchestratorInput
+        .classification
+        .stateC
+        .expectedFailures[0]
+        .testName,
+      "example regression",
+    );
+  },
+);
