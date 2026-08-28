@@ -13,6 +13,7 @@ function createInput() {
       EVIDENCE_REPORT_SCHEMA_VERSION,
 
     toolVersion: "0.0.0-dev",
+    expectationProvenance: null,
 
     repository: {
       baseSha: "a".repeat(40),
@@ -132,6 +133,7 @@ test(
       [
         "schemaVersion",
         "toolVersion",
+        "expectationProvenance",
         "repository",
         "command",
         "envelope",
@@ -662,5 +664,78 @@ test(
         },
       );
     }
+  },
+);
+
+test(
+  "projects expectation provenance without changing report schema version",
+  () => {
+    const input = createInput();
+
+    input.expectationProvenance = {
+      source:
+        "change-proof.prepare-candidate",
+      candidateSha256:
+        "11".repeat(32),
+      candidateContractVersion:
+        "0.1",
+      prepareToolVersion:
+        "0.1.0-beta.1",
+      prepareConfigSha256:
+        "22".repeat(32),
+      repositoryContextSha256:
+        "33".repeat(32),
+      resolvedCommits: {
+        base: "a".repeat(40),
+        head: "b".repeat(40),
+      },
+      executionContractSha256:
+        "44".repeat(32),
+      envelopeSha256:
+        "55".repeat(32),
+      failureSetSha256:
+        "66".repeat(32),
+      runtimeVerified: true,
+    };
+
+    const report =
+      buildEvidenceReport(input);
+
+    assert.equal(
+      report.schemaVersion,
+      EVIDENCE_REPORT_SCHEMA_VERSION,
+    );
+
+    assert.deepEqual(
+      report.expectationProvenance,
+      input.expectationProvenance,
+    );
+
+    assert.notEqual(
+      report.expectationProvenance,
+      input.expectationProvenance,
+    );
+
+    assert.notEqual(
+      report.expectationProvenance
+        .resolvedCommits,
+      input.expectationProvenance
+        .resolvedCommits,
+    );
+  },
+);
+
+test(
+  "manual report provenance is explicitly null",
+  () => {
+    const report =
+      buildEvidenceReport(
+        createInput(),
+      );
+
+    assert.equal(
+      report.expectationProvenance,
+      null,
+    );
   },
 );
