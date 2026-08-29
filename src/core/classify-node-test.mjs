@@ -967,6 +967,81 @@ function failureSpecificMessageFor(
     : message;
 }
 
+function normalizeAssertionFailureMessage(
+  message,
+  code,
+  block,
+) {
+  if (code !== "ERR_ASSERTION") {
+    return message;
+  }
+
+  /*
+   * Node 24 TAP separates a custom assert.* message from its
+   * reporter-generated comparison text with an empty scalar
+   * line. The same diagnostic block also carries explicit
+   * actual: and expected: fields.
+   *
+   * Example:
+   *
+   *   error: |-
+   *     semantic message
+   *
+   *     'actual' !== 'expected'
+   *
+   *   expected: 'expected'
+   *   actual: 'actual'
+   *
+   * The comparison rendering is not stable preregistration
+   * evidence. Keep only the semantic prefix before the separator.
+   *
+   * Requiring both actual and expected fields avoids changing
+   * ordinary multiline assertion messages that merely contain
+   * a blank line.
+   */
+  const hasActual =
+    /^  actual:/m.test(block);
+
+  const hasExpected =
+    /^  expected:/m.test(block);
+
+  if (!hasActual || !hasExpected) {
+    return message;
+  }
+
+  const lines =
+    message.split("\n");
+
+  const separatorIndex =
+    lines.findIndex(
+      (line, index) =>
+        index > 0 &&
+        line === "",
+    );
+
+  if (
+    separatorIndex === -1 ||
+    separatorIndex ===
+      lines.length - 1
+  ) {
+    return message;
+  }
+
+  const semantic =
+    lines
+      .slice(
+        0,
+        separatorIndex,
+      )
+      .join("\n")
+      .replace(/\n+$/u, "");
+
+  return semantic.length === 0
+    ? null
+    : semantic;
+}
+
+
 function failureSpecificFragmentsFor(
   failedTestResult,
 ) {
@@ -988,17 +1063,33 @@ function failureSpecificFragmentsFor(
       failedTestResult.block,
     );
 
+  const code =
+    singleDiagnosticValue(
+      failedTestResult.block,
+      "code",
+    );
+
+  const normalizedMessage =
+    message === null
+      ? null
+      : normalizeAssertionFailureMessage(
+          message,
+          code,
+          failedTestResult.block,
+        );
+
   if (
-    message === null ||
-    message === "test failed" ||
+    normalizedMessage === null ||
+    normalizedMessage ===
+      "test failed" ||
     containsUnsafeFailureSpecificContent(
-      message,
+      normalizedMessage,
     )
   ) {
     return [];
   }
 
-  return [message];
+  return [normalizedMessage];
 }
 
 function inspectionStructuralStatus(

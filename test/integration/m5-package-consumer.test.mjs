@@ -350,7 +350,22 @@ test(
 
       assert.match(
         helpResult.stdout,
+        /change-proof prepare --config <path> --candidate <path>/,
+      );
+
+      assert.match(
+        helpResult.stdout,
+        /change-proof promote --config <path>/,
+      );
+
+      assert.match(
+        helpResult.stdout,
         /change-proof run --config <path>/,
+      );
+
+      assert.match(
+        helpResult.stdout,
+        /prepare -> review candidate -> promote whole candidate -> run promoted config/,
       );
 
       const runHelpResult = run(
@@ -679,11 +694,524 @@ test(
         reportMarkdown,
         new RegExp(headSha),
       );
-
       /*
-       * Policy rejection must happen after reports exist.
-       */
-      const policyReportsDirectory = join(
+     * Beta.2 assisted preregistration through the actual
+     * packed and installed public binary.
+     *
+     * Public workflow:
+     *
+     * prepare -> review candidate -> promote -> run
+     */
+    const beta2PrepareConfigPath = join(
+      temporaryRoot,
+      "change-proof.prepare.json",
+    );
+
+    const beta2CandidatePath = join(
+      temporaryRoot,
+      "candidate.json",
+    );
+
+    const beta2PromotedConfigPath = join(
+      temporaryRoot,
+      "change-proof.promoted.json",
+    );
+
+    const beta2ReportsDirectory = join(
+      temporaryRoot,
+      "beta2-reports",
+    );
+
+    const beta2PrepareConfiguration = {
+      schemaVersion: "0.1",
+
+      repositoryRoot:
+        candidateRepository,
+
+      baseRef:
+        baseSha,
+
+      headRef:
+        headSha,
+
+      command: {
+        executable:
+          process.execPath,
+
+        arguments: [
+          "--test",
+          "--test-reporter=tap",
+          "test/behavior.test.mjs",
+        ],
+
+        workingDirectory:
+          ".",
+
+        environment:
+          {},
+
+        timeoutMs:
+          30_000,
+
+        maxStdoutBytes:
+          4_194_304,
+
+        maxStderrBytes:
+          4_194_304,
+      },
+
+      envelope: {
+        includedPaths: [
+          "test/behavior.test.mjs",
+        ],
+      },
+
+      temporaryParentDirectory:
+        workspaceParent,
+
+      workspacePrefix:
+        "change-proof-beta2-",
+    };
+
+    await write(
+      beta2PrepareConfigPath,
+
+      JSON.stringify(
+        beta2PrepareConfiguration,
+        null,
+        2,
+      ) + "\n",
+    );
+
+    /*
+     * PREPARE
+     */
+    const prepareResult = run(
+      installedBinary,
+      [
+        "prepare",
+        "--config",
+        beta2PrepareConfigPath,
+        "--candidate",
+        beta2CandidatePath,
+      ],
+      {
+        cwd:
+          consumerDirectory,
+      },
+    );
+
+    assertSucceeded(
+      prepareResult,
+      "installed Beta.2 prepare",
+    );
+
+    assert.match(
+      prepareResult.stdout,
+      /Change Proof prepare/,
+    );
+
+    assert.match(
+      prepareResult.stdout,
+      /promotion_eligible=YES/,
+    );
+
+    await access(
+      beta2CandidatePath,
+      fsConstants.R_OK,
+    );
+
+    const beta2CandidateText =
+      await readFile(
+        beta2CandidatePath,
+        "utf8",
+      );
+
+    const beta2Candidate =
+      JSON.parse(
+        beta2CandidateText,
+      );
+
+    assert.equal(
+      beta2Candidate.schemaVersion,
+      "0.1",
+    );
+
+    assert.equal(
+      beta2Candidate.artifactType,
+      "change-proof.prepare-candidate",
+    );
+
+    assert.equal(
+      beta2Candidate.authoritative,
+      false,
+    );
+
+    assert.equal(
+      beta2Candidate.identity
+        .prepareOutcome,
+      "ASSERTION_CANDIDATE_OBSERVED",
+    );
+
+    assert.equal(
+      beta2Candidate.identity
+        .promotionEligible,
+      true,
+    );
+
+    assert.equal(
+      typeof beta2Candidate
+        .candidateSha256,
+      "string",
+    );
+
+    assert.equal(
+      beta2Candidate
+        .candidateSha256.length,
+      64,
+    );
+
+    assert.equal(
+      beta2Candidate.identity
+        .candidateFailures.length,
+      1,
+    );
+
+    assert.equal(
+      beta2Candidate.identity
+        .candidateFailures[0]
+        .testName,
+      "returns head behavior",
+    );
+
+    /*
+     * A prepare candidate is not an authoritative report.
+     */
+    assert.equal(
+      beta2CandidateText.includes(
+        '"verdict"',
+      ),
+      false,
+    );
+
+    /*
+     * PROMOTE
+     */
+    const promoteResult = run(
+      installedBinary,
+      [
+        "promote",
+        "--config",
+        beta2PrepareConfigPath,
+        "--candidate",
+        beta2CandidatePath,
+        "--output-config",
+        beta2PromotedConfigPath,
+        "--output-directory",
+        beta2ReportsDirectory,
+      ],
+      {
+        cwd:
+          consumerDirectory,
+      },
+    );
+
+    assertSucceeded(
+      promoteResult,
+      "installed Beta.2 promote",
+    );
+
+    assert.match(
+      promoteResult.stdout,
+      /Change Proof promote/,
+    );
+
+    assert.match(
+      promoteResult.stdout,
+      /whole_failure_set=ACCEPTED/,
+    );
+
+    await access(
+      beta2PromotedConfigPath,
+      fsConstants.R_OK,
+    );
+
+    const beta2PromotedConfig =
+      JSON.parse(
+        await readFile(
+          beta2PromotedConfigPath,
+          "utf8",
+        ),
+      );
+
+    assert.equal(
+      beta2PromotedConfig.schemaVersion,
+      "0.2",
+    );
+
+    assert.equal(
+      beta2PromotedConfig
+        .expectationProvenance
+        .source,
+      "change-proof.prepare-candidate",
+    );
+
+    assert.equal(
+      beta2PromotedConfig
+        .expectationProvenance
+        .candidateSha256,
+      beta2Candidate.candidateSha256,
+    );
+
+    assert.equal(
+      beta2PromotedConfig
+        .classification
+        .stateC
+        .expectedFailures.length,
+      beta2Candidate.identity
+        .candidateFailures.length,
+    );
+
+    assert.deepEqual(
+      beta2PromotedConfig
+        .classification
+        .stateC
+        .expectedFailures
+        .map(
+          (failure) =>
+            failure.testName,
+        ),
+
+      beta2Candidate.identity
+        .candidateFailures
+        .map(
+          (failure) =>
+            failure.testName,
+        ),
+    );
+
+    /*
+     * AUTHORITATIVE RUN
+     */
+    const beta2RunResult = run(
+      installedBinary,
+      [
+        "run",
+        "--config",
+        beta2PromotedConfigPath,
+      ],
+      {
+        cwd:
+          consumerDirectory,
+      },
+    );
+
+    assertSucceeded(
+      beta2RunResult,
+      "installed Beta.2 authoritative run",
+    );
+
+    assert.match(
+      beta2RunResult.stdout,
+      /OBSERVED_TEST_DISCRIMINATION/,
+    );
+
+    const beta2ReportJsonPath = join(
+      beta2ReportsDirectory,
+      "report.json",
+    );
+
+    const beta2ReportMarkdownPath = join(
+      beta2ReportsDirectory,
+      "report.md",
+    );
+
+    const beta2Report =
+      JSON.parse(
+        await readFile(
+          beta2ReportJsonPath,
+          "utf8",
+        ),
+      );
+
+    const beta2ReportMarkdown =
+      await readFile(
+        beta2ReportMarkdownPath,
+        "utf8",
+      );
+
+    assert.equal(
+      beta2Report.verdict,
+      "OBSERVED_TEST_DISCRIMINATION",
+    );
+
+    assert.equal(
+      beta2Report
+        .expectationProvenance
+        .source,
+      "change-proof.prepare-candidate",
+    );
+
+    assert.equal(
+      beta2Report
+        .expectationProvenance
+        .candidateSha256,
+      beta2Candidate.candidateSha256,
+    );
+
+    assert.equal(
+      beta2Report
+        .expectationProvenance
+        .runtimeVerified,
+      true,
+    );
+
+    assert.match(
+      beta2ReportMarkdown,
+      /Expectation Provenance/,
+    );
+
+    assert.match(
+      beta2ReportMarkdown,
+      /VERIFIED/,
+    );
+
+    assert.match(
+      beta2ReportMarkdown,
+      new RegExp(
+        beta2Candidate
+          .candidateSha256,
+      ),
+    );
+
+    /*
+     * Provenance must fail closed if the promoted expected
+     * failure set is changed after promotion.
+     */
+    const tamperedReportsDirectory = join(
+      temporaryRoot,
+      "beta2-tampered-reports",
+    );
+
+    const tamperedConfigPath = join(
+      temporaryRoot,
+      "change-proof.promoted.tampered.json",
+    );
+
+    const tamperedConfig = {
+      ...beta2PromotedConfig,
+
+      classification: {
+        ...beta2PromotedConfig
+          .classification,
+
+        stateC: {
+          ...beta2PromotedConfig
+            .classification
+            .stateC,
+
+          expectedFailures:
+            beta2PromotedConfig
+              .classification
+              .stateC
+              .expectedFailures
+              .map(
+                (
+                  failure,
+                  index,
+                ) =>
+                  index === 0
+                    ? {
+                        ...failure,
+
+                        outputIncludes: [
+                          ...failure
+                            .outputIncludes,
+
+                          "TAMPERED_AFTER_PROMOTION",
+                        ],
+                      }
+                    : failure,
+              ),
+        },
+      },
+
+      outputDirectory:
+        tamperedReportsDirectory,
+    };
+
+    await write(
+      tamperedConfigPath,
+
+      JSON.stringify(
+        tamperedConfig,
+        null,
+        2,
+      ) + "\n",
+    );
+
+    const tamperedResult = run(
+      installedBinary,
+      [
+        "run",
+        "--config",
+        tamperedConfigPath,
+      ],
+      {
+        cwd:
+          consumerDirectory,
+      },
+    );
+
+    assert.equal(
+      tamperedResult.error,
+      undefined,
+    );
+
+    assert.equal(
+      tamperedResult.signal,
+      null,
+    );
+
+    assert.equal(
+      tamperedResult.status,
+      3,
+      [
+        "tampered promoted config did not fail closed",
+        `stdout:\n${tamperedResult.stdout}`,
+        `stderr:\n${tamperedResult.stderr}`,
+      ].join("\n"),
+    );
+
+    assert.match(
+      tamperedResult.stderr,
+      /EXPECTATION_PROVENANCE_MISMATCH/,
+    );
+
+    await assert.rejects(
+      access(
+        join(
+          tamperedReportsDirectory,
+          "report.json",
+        ),
+        fsConstants.F_OK,
+      ),
+    );
+
+    await assert.rejects(
+      access(
+        join(
+          tamperedReportsDirectory,
+          "report.md",
+        ),
+        fsConstants.F_OK,
+      ),
+    );
+
+    /*
+     * Policy rejection must happen after reports exist.
+     */
+    const policyReportsDirectory = join(
         temporaryRoot,
         "policy-reports",
       );
