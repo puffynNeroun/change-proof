@@ -538,7 +538,8 @@ export async function runCli(input, injected = {}) {
       result =
         await prepareEngine(
           {
-            ...loadedPrepare.prepareConfig,
+            prepareConfig:
+              loadedPrepare.prepareConfig,
 
             prepareToolVersion:
               packageMetadata.version,
@@ -549,7 +550,35 @@ export async function runCli(input, injected = {}) {
                 parsed.candidatePath,
               ),
           },
-          {},
+          {
+            gitExecutable:
+              "git",
+
+            environment: {
+              ...loadedPrepare
+                .prepareConfig
+                .command
+                .environment,
+            },
+
+            timeoutMs:
+              loadedPrepare
+                .prepareConfig
+                .command
+                .timeoutMs,
+
+            maxStdoutBytes:
+              loadedPrepare
+                .prepareConfig
+                .command
+                .maxStdoutBytes,
+
+            maxStderrBytes:
+              loadedPrepare
+                .prepareConfig
+                .command
+                .maxStderrBytes,
+          },
         );
     } catch (error) {
       write(

@@ -205,6 +205,10 @@ The workflow requires:
 - the corresponding Git tag to be absent;
 - the complete regression suite to pass;
 - the package projection to pass;
+- the packed-package consumer acceptance to exercise the public Beta.2
+  `prepare -> review -> promote -> run` path successfully;
+- the final promoted run to expose runtime-verified expectation provenance;
+- a tampered promoted runtime binding to fail closed before producing reports;
 - a clean checkout before staging.
 
 The only npm release mutation performed by the workflow is:

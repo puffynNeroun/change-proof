@@ -598,14 +598,25 @@ test(
               prepareConfig: {
                 schemaVersion: "0.1",
                 repositoryRoot: "/repo",
+
+                command: {
+                  environment: {},
+                  timeoutMs: 30000,
+                  maxStdoutBytes: 4194304,
+                  maxStderrBytes: 4194304,
+                },
               },
             };
           },
 
-          async runPrepare(input) {
+          async runPrepare(
+            input,
+            configuration,
+          ) {
             calls.push({
               type: "prepare",
               input,
+              configuration,
             });
 
             return {
@@ -658,6 +669,31 @@ test(
       "prepare",
     );
 
+    assert.deepEqual(
+      calls[1]
+        .input
+        .prepareConfig,
+      {
+        schemaVersion: "0.1",
+        repositoryRoot: "/repo",
+
+        command: {
+          environment: {},
+          timeoutMs: 30000,
+          maxStdoutBytes: 4194304,
+          maxStderrBytes: 4194304,
+        },
+      },
+    );
+
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(
+        calls[1].input,
+        "repositoryRoot",
+      ),
+      false,
+    );
+
     assert.equal(
       calls[1]
         .input
@@ -670,6 +706,27 @@ test(
         .input
         .prepareToolVersion,
       "0.1.0-beta.1",
+    );
+
+    assert.deepEqual(
+      calls[1]
+        .configuration,
+      {
+        gitExecutable:
+          "git",
+
+        environment:
+          {},
+
+        timeoutMs:
+          30000,
+
+        maxStdoutBytes:
+          4194304,
+
+        maxStderrBytes:
+          4194304,
+      },
     );
 
     assert.match(

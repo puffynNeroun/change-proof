@@ -794,6 +794,102 @@ test(
 );
 
 test(
+  "strips Node 24 assertion comparison framing from a custom block-scalar message",
+  () => {
+    const result =
+      inspectNodeTestEvidence(
+        execution({
+          exitCode: 1,
+
+          stdout:
+            nestedSuitesTap([
+              {
+                suiteName:
+                  "assertion framing suite",
+
+                leaves: [
+                  {
+                    testName:
+                      "assertion framing leaf",
+
+                    failed: true,
+
+                    diagnosticLines: [
+                      "      error: |-",
+                      "        CHANGE_PROOF_STABLE_MESSAGE",
+                      "        ",
+                      "        'base' !== 'head'",
+                      "        ",
+                      "      expected: 'head'",
+                      "      actual: 'base'",
+                      "      operator: 'strictEqual'",
+                    ],
+                  },
+                ],
+              },
+            ]),
+        }),
+      );
+
+    assert.equal(
+      result.structuralStatus,
+      "COMPLETE",
+    );
+
+    assert.deepEqual(
+      result.failedLeaves[0]
+        .failureSpecificFragments,
+      [
+        "CHANGE_PROOF_STABLE_MESSAGE",
+      ],
+    );
+  },
+);
+
+test(
+  "preserves ordinary multiline block-scalar assertion messages without comparison framing",
+  () => {
+    const result =
+      inspectNodeTestEvidence(
+        execution({
+          exitCode: 1,
+
+          stdout:
+            nestedSuitesTap([
+              {
+                suiteName:
+                  "ordinary multiline suite",
+
+                leaves: [
+                  {
+                    testName:
+                      "ordinary multiline leaf",
+
+                    failed: true,
+
+                    diagnosticLines: [
+                      "      error: |-",
+                      "        first semantic line",
+                      "        second semantic line",
+                    ],
+                  },
+                ],
+              },
+            ]),
+        }),
+      );
+
+    assert.deepEqual(
+      result.failedLeaves[0]
+        .failureSpecificFragments,
+      [
+        "first semantic line\nsecond semantic line",
+      ],
+    );
+  },
+);
+
+test(
   "does not merge stack framing into a block scalar semantic message",
   () => {
     const result =
