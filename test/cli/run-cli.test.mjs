@@ -114,6 +114,10 @@ test("implements the exact public CLI and exit-code contract", async (t) => {
     assert.equal(result.exitCode, 0);
     assert.match(result.stdout, /^Change Proof\n/);
     for (const expected of [
+      "change-proof prepare --config <path> --candidate <path>",
+      "change-proof promote --config <path>",
+      "change-proof prepare --config <path> --candidate <path>",
+      "change-proof promote --config <path>",
       "change-proof run --config <path>",
       "--fail-on <VERDICT>",
       "report.json",
@@ -557,3 +561,383 @@ test("implements the exact public CLI and exit-code contract", async (t) => {
     );
   });
 });
+
+test(
+  "Beta.2 public prepare command delegates without duplicating candidate construction",
+  async () => {
+    const stdout = capture();
+    const stderr = capture();
+    const calls = [];
+
+    const exitCode =
+      await runCli(
+        {
+          argumentsList: [
+            "prepare",
+            "--config",
+            "prepare.json",
+            "--candidate",
+            "candidate.json",
+          ],
+
+          stdout,
+          stderr,
+
+          currentWorkingDirectory:
+            "/work/project",
+        },
+
+        {
+          async loadPrepareConfig(path) {
+            calls.push({
+              type: "load",
+              path,
+            });
+
+            return {
+              prepareConfig: {
+                schemaVersion: "0.1",
+                repositoryRoot: "/repo",
+              },
+            };
+          },
+
+          async runPrepare(input) {
+            calls.push({
+              type: "prepare",
+              input,
+            });
+
+            return {
+              candidate: {
+                candidateSha256:
+                  "11".repeat(32),
+
+                identity: {
+                  prepareOutcome:
+                    "ASSERTION_CANDIDATE_OBSERVED",
+
+                  promotionEligible:
+                    true,
+                },
+              },
+
+              candidatePath:
+                "/work/project/candidate.json",
+            };
+          },
+        },
+      );
+
+    assert.equal(
+      exitCode,
+      0,
+    );
+
+    assert.equal(
+      stderr.value(),
+      "",
+    );
+
+    assert.equal(
+      calls.length,
+      2,
+    );
+
+    assert.deepEqual(
+      calls[0],
+      {
+        type: "load",
+        path:
+          "/work/project/prepare.json",
+      },
+    );
+
+    assert.equal(
+      calls[1].type,
+      "prepare",
+    );
+
+    assert.equal(
+      calls[1]
+        .input
+        .candidatePath,
+      "/work/project/candidate.json",
+    );
+
+    assert.equal(
+      calls[1]
+        .input
+        .prepareToolVersion,
+      "0.1.0-beta.1",
+    );
+
+    assert.match(
+      stdout.value(),
+      /promotion_eligible=YES/u,
+    );
+  },
+);
+
+test(
+  "Beta.2 public promote command accepts exactly the whole candidate",
+  async () => {
+    const stdout = capture();
+    const stderr = capture();
+    const calls = [];
+
+    const promoted = {
+      schemaVersion:
+        "0.2",
+
+      expectationProvenance: {
+        candidateSha256:
+          "22".repeat(32),
+      },
+    };
+
+    const exitCode =
+      await runCli(
+        {
+          argumentsList: [
+            "promote",
+            "--config",
+            "prepare.json",
+            "--candidate",
+            "candidate.json",
+            "--output-config",
+            "promoted.json",
+            "--output-directory",
+            "reports",
+          ],
+
+          stdout,
+          stderr,
+
+          currentWorkingDirectory:
+            "/work/project",
+        },
+
+        {
+          async loadPrepareConfig(path) {
+            calls.push({
+              type: "load-config",
+              path,
+            });
+
+            return {
+              prepareConfig: {
+                schemaVersion:
+                  "0.1",
+              },
+            };
+          },
+
+          async loadPrepareCandidate(path) {
+            calls.push({
+              type: "load-candidate",
+              path,
+            });
+
+            return {
+              candidate: {
+                artifactType:
+                  "change-proof.prepare-candidate",
+              },
+            };
+          },
+
+          promotePrepareCandidate(input) {
+            calls.push({
+              type: "promote",
+              input,
+            });
+
+            return promoted;
+          },
+
+          async writeExclusiveArtifact(input) {
+            calls.push({
+              type: "write",
+              input,
+            });
+
+            return {
+              targetPath:
+                input.targetPath,
+            };
+          },
+        },
+      );
+
+    assert.equal(
+      exitCode,
+      0,
+    );
+
+    assert.equal(
+      stderr.value(),
+      "",
+    );
+
+    const promotionCall =
+      calls.find(
+        (item) =>
+          item.type ===
+            "promote",
+      );
+
+    assert.equal(
+      promotionCall
+        .input
+        .outputDirectory,
+      "/work/project/reports",
+    );
+
+    const writeCall =
+      calls.find(
+        (item) =>
+          item.type ===
+            "write",
+      );
+
+    assert.equal(
+      writeCall
+        .input
+        .targetPath,
+      "/work/project/promoted.json",
+    );
+
+    assert.equal(
+      JSON.parse(
+        writeCall.input.content,
+      ).schemaVersion,
+      "0.2",
+    );
+
+    assert.match(
+      stdout.value(),
+      /whole_failure_set=ACCEPTED/u,
+    );
+  },
+);
+
+test(
+  "Beta.2 prepare and promote require explicit artifact options",
+  async () => {
+    const cases = [
+      {
+        argumentsList: [
+          "prepare",
+          "--config",
+          "prepare.json",
+        ],
+
+        code:
+          "CLI_CANDIDATE_REQUIRED",
+      },
+
+      {
+        argumentsList: [
+          "promote",
+          "--config",
+          "prepare.json",
+          "--candidate",
+          "candidate.json",
+        ],
+
+        code:
+          "CLI_OUTPUT_CONFIG_REQUIRED",
+      },
+
+      {
+        argumentsList: [
+          "promote",
+          "--config",
+          "prepare.json",
+          "--candidate",
+          "candidate.json",
+          "--output-config",
+          "promoted.json",
+        ],
+
+        code:
+          "CLI_OUTPUT_DIRECTORY_REQUIRED",
+      },
+    ];
+
+    for (const item of cases) {
+      const stdout = capture();
+      const stderr = capture();
+
+      const exitCode =
+        await runCli({
+          argumentsList:
+            item.argumentsList,
+
+          stdout,
+          stderr,
+
+          currentWorkingDirectory:
+            "/work/project",
+        });
+
+      assert.equal(
+        exitCode,
+        2,
+      );
+
+      assert.equal(
+        stdout.value(),
+        "",
+      );
+
+      assert.equal(
+        stderr.value(),
+        `change-proof: usage error: ${item.code}\n`,
+      );
+    }
+  },
+);
+
+test(
+  "Beta.2 prepare and promote help reuse public help",
+  async () => {
+    for (const command of [
+      "prepare",
+      "promote",
+    ]) {
+      const stdout = capture();
+      const stderr = capture();
+
+      const exitCode =
+        await runCli({
+          argumentsList: [
+            command,
+            "--help",
+          ],
+
+          stdout,
+          stderr,
+
+          currentWorkingDirectory:
+            "/work/project",
+        });
+
+      assert.equal(
+        exitCode,
+        0,
+      );
+
+      assert.equal(
+        stderr.value(),
+        "",
+      );
+
+      assert.match(
+        stdout.value(),
+        /prepare -> review candidate -> promote whole candidate -> run promoted config/u,
+      );
+    }
+  },
+);

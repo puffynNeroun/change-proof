@@ -87,7 +87,7 @@ jobs:
             );
           }
 
-          if (pack.entryCount !== 27) {
+          if (pack.entryCount !== 28) {
             throw new Error(
               `unexpected package entry count: ${pack.entryCount}`,
             );
