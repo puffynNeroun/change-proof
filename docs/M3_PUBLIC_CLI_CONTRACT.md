@@ -136,7 +136,7 @@ It does not reproduce State A, State B, State C, worktree ownership, explicit-en
 
 ## Package boundary
 
-At M3, the manifest package name was `change-proof` at version `0.1.0-beta.1`, with the `change-proof` binary and Node.js `>=24`. M5.3 later established `@changeproof/cli` as the canonical npm package identity while preserving the `change-proof` binary. The manifest remains `private: true`; no npm package has been published.
+At M3, the manifest package name was `change-proof` at version `0.1.0-beta.1`, with the `change-proof` binary and Node.js `>=24`. At the end of M3, the manifest remained `private: true` and no npm package had been published. M5.3 later established `@changeproof/cli` as the canonical npm package identity while preserving the `change-proof` binary. Subsequent release milestones removed the private publication lock and published `@changeproof/cli@0.1.0-beta.1`; those later distribution changes do not alter the historical M3 CLI contract.
 
 The package allowlist contains only `bin`, `src`, `README.md`, `LICENSE`, and `change-proof.config.example.json`. It exposes no `main`, `module`, or `exports` entry and therefore promises no public JavaScript SDK. Tests, experiments, and this contract document are not part of the package inventory.
 

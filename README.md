@@ -6,6 +6,8 @@ Change Proof is a local evidence tool for checking whether explicitly selected c
 
 **Public v0.1 beta: `0.1.0-beta.1`**
 
+The public npm `beta` dist-tag currently resolves to `0.1.0-beta.1`. The repository `main` additionally contains unreleased Beta.2 functionality.
+
 The Change Proof repository is public. The production three-state evidence engine and configuration-driven CLI have been validated on two bounded external repository cases: the earlier Rulden pilot and the project-forge nested `node:test` pilot.
 
 The initial npm distribution uses the canonical package `@changeproof/cli` and the explicit `beta` dist-tag. This remains a beta contract: it is not a stable-release, production-readiness, general correctness, broad framework-support, or sandboxing claim.
@@ -58,9 +60,11 @@ Run a manually preregistered evidence check:
 change-proof run --config change-proof.config.json
 ```
 
-### Beta.2 prepare -> review -> promote -> run workflow
+### Unreleased Beta.2 prepare -> review -> promote -> run workflow
 
-Beta.2 adds an optional assisted preregistration workflow without changing the authoritative three-state evidence engine.
+The current repository `main` adds an optional assisted preregistration workflow without changing the authoritative three-state evidence engine.
+
+This workflow is not yet part of the registry-installed `@changeproof/cli@beta` package. Use an exact reviewed `main` checkout or reviewed packed build for Beta.2 cold-start validation.
 
 Prepare a non-authoritative candidate:
 
@@ -137,11 +141,7 @@ Or run the beta without a global installation:
 npx --yes @changeproof/cli@beta run --config change-proof.config.json
 ```
 
-During the one-time bootstrap window, if the npm registry does not yet resolve `@changeproof/cli@beta`, run the exact repository checkout with Node.js 24 or newer:
-
-```text
-node bin/change-proof.mjs run --config change-proof.config.json
-```
+For unreleased Beta.2 validation, use an exact reviewed `main` checkout or reviewed packed build rather than the registry `@changeproof/cli@beta` package.
 
 ## Configuration
 
