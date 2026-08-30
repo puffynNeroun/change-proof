@@ -3054,3 +3054,149 @@ test(
     );
   },
 );
+
+
+test(
+  "replays a prepare-style normalized multiline assertion fragment",
+  () => {
+    const testName =
+      "multiline prepare candidate";
+
+    const stdout = [
+      "TAP version 13",
+      `# Subtest: ${testName}`,
+      `not ok 1 - ${testName}`,
+      "  ---",
+      "  duration_ms: 1",
+      "  type: 'test'",
+      "  failureType: 'testCodeFailure'",
+      "  error: |-",
+      "    first semantic line",
+      "    second semantic line",
+      "  code: 'ERR_ASSERTION'",
+      "  ...",
+      "1..1",
+      "# tests 1",
+      "# pass 0",
+      "# fail 1",
+      "# cancelled 0",
+      "# skipped 0",
+      "# todo 0",
+      "",
+    ].join("\n");
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout,
+          }),
+
+        expectedTestCount: 1,
+
+        expectedFailures: [
+          {
+            testName,
+            outputIncludes: [
+              "first semantic line\nsecond semantic line",
+            ],
+          },
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES
+        .TEST_ASSERTION_FAILURE,
+    );
+
+    assert.equal(
+      result.reasonCode,
+      NODE_TEST_REASON_CODES
+        .EXPECTED_ASSERTION_FAILURE_OBSERVED,
+    );
+  },
+);
+
+
+test(
+  "does not replay a normalized multiline fragment from a sibling failure",
+  () => {
+    const stdout = [
+      "TAP version 13",
+
+      "# Subtest: first failure",
+      "not ok 1 - first failure",
+      "  ---",
+      "  duration_ms: 1",
+      "  type: 'test'",
+      "  failureType: 'testCodeFailure'",
+      "  error: |-",
+      "    first semantic line",
+      "    first second line",
+      "  code: 'ERR_ASSERTION'",
+      "  ...",
+
+      "# Subtest: second failure",
+      "not ok 2 - second failure",
+      "  ---",
+      "  duration_ms: 1",
+      "  type: 'test'",
+      "  failureType: 'testCodeFailure'",
+      "  error: |-",
+      "    sibling semantic line",
+      "    sibling second line",
+      "  code: 'ERR_ASSERTION'",
+      "  ...",
+
+      "1..2",
+      "# tests 2",
+      "# pass 0",
+      "# fail 2",
+      "# cancelled 0",
+      "# skipped 0",
+      "# todo 0",
+      "",
+    ].join("\n");
+
+    const result =
+      classifyExpectedNodeTestRegression({
+        executionResult:
+          execution({
+            exitCode: 1,
+            stdout,
+          }),
+
+        expectedTestCount: 2,
+
+        expectedFailures: [
+          {
+            testName:
+              "first failure",
+            outputIncludes: [
+              "sibling semantic line\nsibling second line",
+            ],
+          },
+          {
+            testName:
+              "second failure",
+            outputIncludes: [
+              "sibling semantic line\nsibling second line",
+            ],
+          },
+        ],
+      });
+
+    assert.equal(
+      result.outcome,
+      NODE_TEST_OUTCOMES.INCONCLUSIVE,
+    );
+
+    assert.equal(
+      result.reasonCode,
+      NODE_TEST_REASON_CODES
+        .EXPECTED_ASSERTION_FAILURE_NOT_OBSERVED,
+    );
+  },
+);
