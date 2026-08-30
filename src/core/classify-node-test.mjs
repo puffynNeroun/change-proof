@@ -977,10 +977,11 @@ function normalizeAssertionFailureMessage(
   }
 
   /*
-   * Node 24 TAP separates a custom assert.* message from its
+   * Node 24 TAP may separate a custom assert.* message from its
    * reporter-generated comparison text with an empty scalar
-   * line. The same diagnostic block also carries explicit
-   * actual: and expected: fields.
+   * line or start the comparison directly with
+   * "+ actual - expected". The same diagnostic block also
+   * carries explicit actual: and expected: fields.
    *
    * Example:
    *
@@ -1012,18 +1013,17 @@ function normalizeAssertionFailureMessage(
   const lines =
     message.split("\n");
 
-  const separatorIndex =
+  const comparisonStartIndex =
     lines.findIndex(
       (line, index) =>
         index > 0 &&
-        line === "",
+        (
+          line === "" ||
+          line === "+ actual - expected"
+        ),
     );
 
-  if (
-    separatorIndex === -1 ||
-    separatorIndex ===
-      lines.length - 1
-  ) {
+  if (comparisonStartIndex === -1) {
     return message;
   }
 
@@ -1031,7 +1031,7 @@ function normalizeAssertionFailureMessage(
     lines
       .slice(
         0,
-        separatorIndex,
+        comparisonStartIndex,
       )
       .join("\n")
       .replace(/\n+$/u, "");
@@ -1888,12 +1888,21 @@ export function classifyExpectedNodeTestRegression(
                 failure.testName,
               );
 
+            const normalizedFragments =
+              failureSpecificFragmentsFor(
+                failure,
+              );
+
             const fragmentsObserved =
               expectedFailure
                 .outputIncludes
                 .every(
                   (fragment) =>
                     failure.block
+                      .includes(
+                        fragment,
+                      ) ||
+                    normalizedFragments
                       .includes(
                         fragment,
                       ),

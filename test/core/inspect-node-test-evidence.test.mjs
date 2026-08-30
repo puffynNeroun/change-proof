@@ -1185,3 +1185,51 @@ test(
     );
   },
 );
+
+
+test(
+  "strips Node 24 assertion comparison framing without a blank separator",
+  () => {
+    const result =
+      inspectNodeTestEvidence(
+        execution({
+          exitCode: 1,
+          stdout:
+            nestedSuitesTap([
+              {
+                suiteName:
+                  "no-separator framing suite",
+                leaves: [
+                  {
+                    testName:
+                      "no-separator framing leaf",
+                    failed: true,
+                    diagnosticLines: [
+                      "      error: |-",
+                      "        semantic mismatch",
+                      "        + actual - expected",
+                      "      expected: 'expected'",
+                      "      actual: 'actual'",
+                      "      operator: 'strictEqual'",
+                    ],
+                  },
+                ],
+              },
+            ]),
+        }),
+      );
+
+    assert.equal(
+      result.structuralStatus,
+      "COMPLETE",
+    );
+
+    assert.deepEqual(
+      result.failedLeaves[0]
+        .failureSpecificFragments,
+      [
+        "semantic mismatch",
+      ],
+    );
+  },
+);
