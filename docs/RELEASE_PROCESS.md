@@ -6,11 +6,15 @@ This document defines the release boundary for the Change Proof public beta.
 
 Release preparation, npm publication, trusted-publisher configuration, Git tagging, and GitHub Release creation are separate gates. A successful CI or preflight run does not by itself authorize or prove completion of another gate.
 
-## Current release candidate
+## Current public release state
 
 The canonical npm package is `@changeproof/cli`.
 
-The initial beta version is `0.1.0-beta.1`, the installed executable is `change-proof`, and the npm prerelease dist-tag is `beta`.
+The current public beta is `0.1.0-beta.1`, the installed executable is `change-proof`, and the npm prerelease dist-tag is `beta`.
+
+The `main` branch also contains unreleased Beta.2 assisted preregistration functionality (`prepare -> review -> promote -> run`). That repository state is not yet an npm Beta.2 release and does not authorize a version bump or publication.
+
+The independent Beta.2 cold-start readiness protocol is defined in [`BETA2_COLD_START_VALIDATION.md`](BETA2_COLD_START_VALIDATION.md).
 
 The source repository is public and GitHub Private Vulnerability Reporting is enabled.
 
@@ -45,7 +49,7 @@ The `main` branch is protected and requires the project's GitHub Actions CI chec
 
 The release-candidate manifest is intentionally publishable: the earlier `"private": true` bootstrap safety lock is removed only in the reviewed release-candidate change.
 
-The bootstrap npm publication is complete. The corresponding Git tag and GitHub prerelease remain deliberately absent until the post-bootstrap Trusted Publishing and credential-retirement gates are complete.
+The beta.1 bootstrap release is complete: `@changeproof/cli@0.1.0-beta.1` is public, the `v0.1.0-beta.1` Git tag exists, and the `Change Proof 0.1.0-beta.1` GitHub prerelease has been published. The published npm version must not be republished, and the existing public tag must not be moved or reused.
 
 ## Historical bootstrap release candidate preflight
 
