@@ -4,6 +4,11 @@ This protocol validates whether a new user can complete the unreleased Beta.2 as
 
 It is a usability and workflow validation, not additional evidence semantics and not a release authorization.
 
+A project-team post-fix revalidation is recorded in
+[`BETA2_COLD_START_REVALIDATION.md`](BETA2_COLD_START_REVALIDATION.md).
+That revalidation passed the technical workflow but does not satisfy the
+independent-operator acceptance defined by this protocol.
+
 ## Preconditions
 
 Use:
