@@ -4,9 +4,9 @@ Change Proof is a local evidence tool for checking whether explicitly selected c
 
 ## Current status
 
-**Public v0.1 beta: `0.1.0-beta.1`**
+**Current v0.1 beta source/package version: `0.1.0-beta.2`**
 
-The public npm `beta` dist-tag currently resolves to `0.1.0-beta.1`. The repository `main` additionally contains unreleased Beta.2 functionality.
+Public npm availability and dist-tag state are separate release facts and must be verified from the registry. The project intentionally uses the explicit `beta` dist-tag as its prerelease channel.
 
 The Change Proof repository is public. The production three-state evidence engine and configuration-driven CLI have been validated on two bounded external repository cases: the earlier Rulden pilot and the project-forge nested `node:test` pilot.
 
@@ -247,7 +247,7 @@ Install it with:
 npm install -g @changeproof/cli@beta
 ```
 
-The npm registry currently resolves both `beta` and `latest` to the initial prerelease because this is the package's first published version. Only `beta` is the intentional prerelease channel; `latest` must not be described as a stable Change Proof release until an actual stable version is published. Registry publication, provenance, Git tagging, and GitHub prerelease creation remain separate release gates.
+On the initial npm publication, the registry initialized both `beta` and `latest` to `0.1.0-beta.1`. Only `beta` is the intentional prerelease channel; `latest` must not be described as a stable Change Proof release until an actual stable version is published. Current registry mappings must be verified from npm, and registry publication, provenance, Git tagging, and GitHub prerelease creation remain separate release gates.
 
 ## License
 

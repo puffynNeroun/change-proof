@@ -138,7 +138,7 @@ test("implements the exact public CLI and exit-code contract", async (t) => {
   await t.test("--version", async () => {
     const result = await invoke(["--version"]);
     assert.equal(result.exitCode, 0);
-    assert.equal(result.stdout, "0.1.0-beta.1\n");
+    assert.equal(result.stdout, "0.1.0-beta.2\n");
   });
 
   const usageCases = [
@@ -705,7 +705,7 @@ test(
       calls[1]
         .input
         .prepareToolVersion,
-      "0.1.0-beta.1",
+      "0.1.0-beta.2",
     );
 
     assert.deepEqual(

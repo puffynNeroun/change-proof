@@ -2,6 +2,31 @@
 
 All notable public changes to Change Proof are recorded here.
 
+## 0.1.0-beta.2 - 2026-09-01
+
+Beta.2 adds assisted preregistration while preserving the existing manual schema `0.1` evidence workflow.
+
+### Added
+
+- `prepare` creates a non-authoritative candidate from observed A/B/C execution.
+- Human review precedes whole-candidate `promote`; selective failure acceptance is not part of the workflow.
+- Promoted schema `0.2` records expectation provenance for the reviewed candidate, repository context, resolved commits, execution contract, selected envelope, and complete expected failure set.
+- Authoritative runs verify promoted expectation provenance at runtime and fail closed before reports when protected expectations are changed.
+
+### Fixed
+
+- Improved Node.js 24 assertion-message normalization and replay so prepare-generated assertion expectations reproduce correctly during the promoted authoritative run.
+
+### Validation
+
+- Project-team post-fix revalidation completed the full `prepare -> review -> promote -> run` path and provenance-mismatch check.
+- A fresh-session clean-room operator validation completed the documented public workflow with `PASS WITH FRICTION`.
+- The fresh-session result is not represented as independent-human validation.
+
+### Release boundary
+
+- This remains a prerelease beta and does not claim stable-release maturity, general implementation correctness, complete regression coverage, broad framework support, or sandboxing.
+
 ## 0.1.0-beta.1 - 2026-08-10
 
 Initial public beta.
