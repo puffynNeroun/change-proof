@@ -24,7 +24,20 @@ fail-closed check. The result is recorded in
 
 That result resolves the observed Task 12 workflow blocker but does not satisfy
 the independent-operator cold-start gate and does not authorize a version bump,
-npm staging, or publication.
+npm staging, or publication by itself.
+
+A subsequent fresh-session clean-room validation of commit
+`0e746f3a1448e47a345af570980514bd9c2b64e1` completed the documented public
+workflow with `PASS WITH FRICTION`. The result is recorded in
+[`BETA2_FRESH_SESSION_VALIDATION.md`](BETA2_FRESH_SESSION_VALIDATION.md).
+
+That fresh-session result is not represented as independent-human validation.
+For this solo-maintainer Beta.2 release, it is accepted as sufficient usability
+evidence to proceed to preparation and review of a `0.1.0-beta.2`
+release-candidate change.
+
+This decision does not authorize npm staging, npm approval, publication,
+Git tagging, or GitHub Release creation. Those remain separate release gates.
 
 The source repository is public and GitHub Private Vulnerability Reporting is enabled.
 
