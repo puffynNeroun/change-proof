@@ -16,6 +16,16 @@ The `main` branch also contains unreleased Beta.2 assisted preregistration funct
 
 The independent Beta.2 cold-start readiness protocol is defined in [`BETA2_COLD_START_VALIDATION.md`](BETA2_COLD_START_VALIDATION.md).
 
+A project-team post-fix revalidation of commit
+`c9874def705aefbe0b55a401ebd8b05279d20457` passed the complete
+`prepare -> review -> promote -> run` workflow and the provenance-mismatch
+fail-closed check. The result is recorded in
+[`BETA2_COLD_START_REVALIDATION.md`](BETA2_COLD_START_REVALIDATION.md).
+
+That result resolves the observed Task 12 workflow blocker but does not satisfy
+the independent-operator cold-start gate and does not authorize a version bump,
+npm staging, or publication.
+
 The source repository is public and GitHub Private Vulnerability Reporting is enabled.
 
 ## Observed bootstrap publication result
