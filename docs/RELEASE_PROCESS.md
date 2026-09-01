@@ -10,9 +10,11 @@ Release preparation, npm publication, trusted-publisher configuration, Git taggi
 
 The canonical npm package is `@changeproof/cli`.
 
-The current public beta is `0.1.0-beta.1`, the installed executable is `change-proof`, and the npm prerelease dist-tag is `beta`.
+The current public npm beta remains `0.1.0-beta.1`, the installed executable is `change-proof`, and the npm prerelease dist-tag is `beta`.
 
-The `main` branch also contains unreleased Beta.2 assisted preregistration functionality (`prepare -> review -> promote -> run`). That repository state is not yet an npm Beta.2 release and does not authorize a version bump or publication.
+The `main` branch now contains the reviewed `0.1.0-beta.2` release candidate, including Beta.2 assisted preregistration (`prepare -> review -> promote -> run`). The release-candidate version bump is complete in source, but `0.1.0-beta.2` is not yet a public npm release.
+
+The next release gate is npm staging preflight. The release-candidate merge does not by itself authorize npm staging, npm approval, publication, Git tagging, or GitHub Release creation.
 
 The independent Beta.2 cold-start readiness protocol is defined in [`BETA2_COLD_START_VALIDATION.md`](BETA2_COLD_START_VALIDATION.md).
 
