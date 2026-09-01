@@ -10,11 +10,13 @@ Release preparation, npm publication, trusted-publisher configuration, Git taggi
 
 The canonical npm package is `@changeproof/cli`.
 
-The current public npm beta remains `0.1.0-beta.1`, the installed executable is `change-proof`, and the npm prerelease dist-tag is `beta`.
+The current public npm beta is `0.1.0-beta.2`, the installed executable is `change-proof`, and the intentional npm prerelease dist-tag is `beta`.
 
-The `main` branch now contains the reviewed `0.1.0-beta.2` release candidate, including Beta.2 assisted preregistration (`prepare -> review -> promote -> run`). The release-candidate version bump is complete in source, but `0.1.0-beta.2` is not yet a public npm release.
+The registry `beta` dist-tag points to `0.1.0-beta.2`. The registry-created `latest` alias remains on `0.1.0-beta.1` and does not represent a stable Change Proof release.
 
-The next release gate is npm staging preflight. The release-candidate merge does not by itself authorize npm staging, npm approval, publication, Git tagging, or GitHub Release creation.
+Beta.2 was staged through npm Trusted Publishing from reviewed commit `7949f1f76bd88dcce4c11a98a47c46683f30e648`, explicitly approved by the maintainer with npm 2FA, and accepted through public-registry installation, CLI, signature, provenance, assisted-preregistration, authoritative-run, and provenance-mismatch checks.
+
+The immutable Git tag `v0.1.0-beta.2` points to that exact release commit, and the `Change Proof 0.1.0-beta.2` GitHub prerelease is published. The Beta.2 release is complete; the published npm version must not be republished and the public tag must not be moved or reused.
 
 The independent Beta.2 cold-start readiness protocol is defined in [`BETA2_COLD_START_VALIDATION.md`](BETA2_COLD_START_VALIDATION.md).
 

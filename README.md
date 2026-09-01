@@ -60,11 +60,11 @@ Run a manually preregistered evidence check:
 change-proof run --config change-proof.config.json
 ```
 
-### Unreleased Beta.2 prepare -> review -> promote -> run workflow
+### Beta.2 prepare -> review -> promote -> run workflow
 
-The current repository `main` adds an optional assisted preregistration workflow without changing the authoritative three-state evidence engine.
+The public Beta.2 release adds an optional assisted preregistration workflow without changing the authoritative three-state evidence engine.
 
-This workflow is not yet part of the registry-installed `@changeproof/cli@beta` package. Use an exact reviewed `main` checkout or reviewed packed build for Beta.2 cold-start validation.
+This workflow is included in `@changeproof/cli@0.1.0-beta.2` and is available through the explicit `@changeproof/cli@beta` prerelease channel.
 
 Prepare a non-authoritative candidate:
 
@@ -141,7 +141,7 @@ Or run the beta without a global installation:
 npx --yes @changeproof/cli@beta run --config change-proof.config.json
 ```
 
-For unreleased Beta.2 validation, use an exact reviewed `main` checkout or reviewed packed build rather than the registry `@changeproof/cli@beta` package.
+For reproducible Beta.2 use, select the exact `@changeproof/cli@0.1.0-beta.2` version; normal beta consumers should continue to use the explicit `@changeproof/cli@beta` prerelease channel.
 
 ## Configuration
 
@@ -239,7 +239,7 @@ M4.2 repeats the local beta evidence observation on project-forge's nested `node
 
 The canonical npm package is `@changeproof/cli`. The installed executable is `change-proof`.
 
-The initial public beta line is `0.1.0-beta.1` and is distributed under the explicit npm `beta` dist-tag.
+The current public beta is `0.1.0-beta.2` and is distributed under the explicit npm `beta` dist-tag.
 
 Install it with:
 
