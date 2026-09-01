@@ -9,6 +9,12 @@ A project-team post-fix revalidation is recorded in
 That revalidation passed the technical workflow but does not satisfy the
 independent-operator acceptance defined by this protocol.
 
+A separate fresh-session clean-room validation is recorded in
+[`BETA2_FRESH_SESSION_VALIDATION.md`](BETA2_FRESH_SESSION_VALIDATION.md).
+It completed the public workflow with `PASS WITH FRICTION`, but it is not
+represented as independent-human validation and does not change the
+independent-operator acceptance boundary below.
+
 ## Preconditions
 
 Use:
