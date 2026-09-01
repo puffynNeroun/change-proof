@@ -1,6 +1,6 @@
 # Beta.2 independent cold-start validation
 
-This protocol validates whether a new user can complete the unreleased Beta.2 assisted preregistration workflow from documented public surfaces without reading Change Proof source code.
+This protocol records the prerelease validation used to determine whether a new user could complete the Beta.2 assisted preregistration workflow from documented public surfaces without reading Change Proof source code.
 
 It is a usability and workflow validation, not additional evidence semantics and not a release authorization.
 
@@ -25,7 +25,7 @@ Use:
 - explicit BASE and HEAD refs;
 - a real changed-test envelope suitable for the external repository.
 
-Do not use the registry-installed `@changeproof/cli@beta` package for this validation while it still resolves to `0.1.0-beta.1`.
+At the time of this prerelease validation, the registry-installed `@changeproof/cli@beta` package still resolved to `0.1.0-beta.1`, so the protocol intentionally required an exact reviewed `main` checkout or reviewed packed artifact instead.
 
 ## Operator workflow
 

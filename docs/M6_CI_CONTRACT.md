@@ -44,8 +44,8 @@ The CI job must:
 1. run the complete `npm test` regression suite;
 2. therefore exercise the isolated packed-package consumer acceptance already included in the suite;
 3. project the npm package with `npm pack --dry-run --ignore-scripts --json`;
-4. verify `@changeproof/cli@0.1.0-beta.1`;
-5. verify the exact 18-file package inventory;
+4. verify the package name is `@changeproof/cli` and the packed version matches `package.json`;
+5. verify the exact 28-file package inventory;
 6. verify there are no bundled dependencies;
 7. reject leakage of tests, docs, or GitHub workflow files into the package;
 8. finish with a clean Git checkout and no generated `.tgz` artifact.
