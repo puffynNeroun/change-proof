@@ -1,6 +1,6 @@
 {
   "name": "@changeproof/cli",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Reproducible evidence that changed tests distinguish base and head behavior.",
   "license": "Apache-2.0",
   "repository": {

@@ -133,7 +133,7 @@ test("loads and validates the strict M3 configuration", async (t) => {
     assert.equal(
       (await loadChangeProofConfig(item.configPath))
         .orchestratorInput.toolVersion,
-      "0.1.0-beta.1",
+      "0.1.0-beta.2",
     );
   });
 

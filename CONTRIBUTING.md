@@ -46,9 +46,9 @@ For changes that can affect package contents, metadata, documentation included i
 The current pre-release package contract is:
 
 - package: `@changeproof/cli`;
-- version: `0.1.0-beta.1`;
+- version: `0.1.0-beta.2`;
 - binary: `change-proof`;
-- package inventory: 18 files;
+- package inventory: 28 files;
 - no bundled dependencies.
 
 Do not create or commit generated `.tgz` artifacts.
