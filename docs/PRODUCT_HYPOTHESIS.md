@@ -2,7 +2,11 @@
 
 ## Status
 
-Proposed research hypothesis. This is not a validated product or stable public contract.
+Historical product hypothesis and current product-validation framing.
+
+The original technical hypothesis has progressed beyond the M0/M1 experiment into a public `0.1.0-beta.2` CLI with bounded external technical validations. This document is retained to preserve the original reasoning while recording the product question that remains unresolved.
+
+Change Proof is still a prerelease beta. Technical feasibility within the documented narrow scope does not establish product-market fit, stable-release maturity, or broad production readiness.
 
 ## Problem
 
@@ -44,8 +48,16 @@ Change Proof records whether selected changed tests were observed failing agains
 
 This must not be expanded into a correctness guarantee.
 
-## Current decision
+## Historical M0 decision
 
-Proceed only through M0 product definition and the M1 controlled fixture experiment.
+At M0, the decision was to proceed only through product definition and the M1 controlled fixture experiment, and not to approve a reusable execution architecture until the positive mechanism and required negative cases were reproduced.
 
-Do not approve a reusable execution architecture until the positive mechanism and required negative cases are reproduced.
+That engineering gate has since been passed for the documented bounded v0.1 scope.
+
+## Current validation question
+
+The unresolved product question is now:
+
+> Will developers and reviewers find this evidence useful enough to adopt it in real change-review workflows and use it repeatedly?
+
+The next stage is external product validation. Development should prioritize observed bugs, onboarding friction, evidence clarity, and other problems demonstrated by real users rather than speculative expansion of product scope.
