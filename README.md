@@ -7,7 +7,7 @@ Change Proof is an open-source local CLI that records bounded evidence about whe
 ~~~text
 State A  BASE implementation + BASE tests           PASS
 State B  HEAD implementation + HEAD tests           PASS
-State C  BASE implementation + selected HEAD tests  EXPECTED ASSERTION FAILURE
+State C  BASE implementation + selected HEAD tests  TEST_ASSERTION_FAILURE
 
 boundary=VALID
 verdict=OBSERVED_TEST_DISCRIMINATION
