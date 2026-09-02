@@ -886,7 +886,7 @@ test(
       [
         "timeout",
         OWNED_WORKSPACE_ERROR_CODES.GIT_TIMEOUT,
-        { timeoutMs: 40 },
+        { timeoutMs: 1_000 },
       ],
       [
         "signal",
