@@ -1,0 +1,1151 @@
+/* ============================================================
+   CHANGE PROOF — NARRATIVE UI V3
+   One UI composition per story phase.
+   ============================================================ */
+
+.cp-narrative-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  pointer-events: none;
+}
+
+.cp-narrative {
+  position: absolute;
+
+  color:
+    rgba(
+      246,
+      248,
+      245,
+      0.92
+    );
+
+  pointer-events: none;
+
+  animation:
+    cp-v3-enter
+    560ms
+    cubic-bezier(
+      0.22,
+      1,
+      0.36,
+      1
+    )
+    both;
+}
+
+.cp-narrative__index {
+  display: flex;
+  gap: 12px;
+
+  margin-bottom: 17px;
+
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.43
+    );
+
+  font-family:
+    var(--cp-mono);
+
+  font-size: 8px;
+
+  letter-spacing: 0.12em;
+}
+
+/* ============================================================
+   01 / IDLE — floating specimen, not a dashboard card
+   ============================================================ */
+
+.cp-narrative--idle {
+  top: 29%;
+  right: clamp(
+    54px,
+    5.5vw,
+    118px
+  );
+
+  width: 350px;
+
+  padding-left: 20px;
+
+  border-left:
+    1px solid
+    rgba(
+      22,
+      29,
+      31,
+      0.28
+    );
+
+  color: #20272a;
+}
+
+.cp-narrative--idle::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: -1px;
+
+  width: 1px;
+  height: 48px;
+
+  background:
+    rgba(
+      22,
+      29,
+      31,
+      0.90
+    );
+
+  transform-origin: top;
+
+  animation:
+    cp-v3-grow-y
+    700ms
+    ease-out
+    both;
+}
+
+.cp-narrative--idle
+.cp-narrative__index {
+  color:
+    rgba(
+      26,
+      33,
+      36,
+      0.46
+    );
+}
+
+.cp-narrative__idle-main {
+  display: grid;
+  gap: 5px;
+}
+
+.cp-narrative__idle-main small {
+  font-family:
+    var(--cp-mono);
+
+  font-size: 8px;
+
+  letter-spacing: 0.10em;
+
+  opacity: 0.48;
+}
+
+.cp-narrative__idle-main strong {
+  font-family:
+    var(--cp-halo);
+
+  font-size: 35px;
+  font-weight: 400;
+
+  line-height: 0.95;
+
+  letter-spacing: -0.035em;
+}
+
+.cp-narrative__idle-main p {
+  margin: 3px 0 0;
+
+  font-family:
+    var(--cp-body);
+
+  font-size: 12px;
+
+  opacity: 0.58;
+}
+
+.cp-narrative__delta {
+  display: grid;
+
+  grid-template-columns:
+    auto auto 1fr auto auto;
+
+  gap: 11px;
+
+  align-items: center;
+
+  margin-top: 25px;
+  padding: 13px 0;
+
+  border-top:
+    1px solid
+    rgba(
+      22,
+      29,
+      31,
+      0.16
+    );
+
+  border-bottom:
+    1px solid
+    rgba(
+      22,
+      29,
+      31,
+      0.16
+    );
+}
+
+.cp-narrative__delta span {
+  font-family:
+    var(--cp-mono);
+
+  font-size: 7px;
+
+  opacity: 0.44;
+}
+
+.cp-narrative__delta strong {
+  font-family:
+    var(--cp-halo);
+
+  font-size: 25px;
+  font-weight: 400;
+}
+
+.cp-narrative__delta i {
+  display: block;
+
+  height: 1px;
+
+  background:
+    rgba(
+      22,
+      29,
+      31,
+      0.25
+    );
+}
+
+.cp-narrative__meta {
+  display: flex;
+  gap: 28px;
+
+  margin-top: 14px;
+}
+
+.cp-narrative__meta span {
+  display: grid;
+  gap: 4px;
+
+  font-family:
+    var(--cp-mono);
+
+  font-size: 7px;
+
+  opacity: 0.50;
+}
+
+.cp-narrative__meta b {
+  font-size: 9px;
+  font-weight: 500;
+
+  opacity: 1;
+}
+
+/* ============================================================
+   02 / TRANSITION — operation trace
+   ============================================================ */
+
+.cp-narrative--transition {
+  top: 28%;
+  right: clamp(
+    50px,
+    5.0vw,
+    106px
+  );
+
+  width: 390px;
+
+  padding: 22px 24px;
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.09
+    );
+
+  background:
+    rgba(
+      14,
+      19,
+      21,
+      0.76
+    );
+
+  backdrop-filter:
+    blur(10px);
+}
+
+.cp-operation-head {
+  display: grid;
+  gap: 6px;
+
+  margin-bottom: 21px;
+}
+
+.cp-operation-head small {
+  font-family:
+    var(--cp-mono);
+
+  font-size: 8px;
+
+  letter-spacing: 0.10em;
+
+  opacity: 0.40;
+}
+
+.cp-operation-head strong {
+  font-family:
+    var(--cp-halo);
+
+  font-size: 30px;
+  font-weight: 400;
+
+  letter-spacing: -0.03em;
+}
+
+.cp-operation-trace {
+  display: grid;
+}
+
+.cp-operation-trace > div {
+  position: relative;
+
+  display: grid;
+
+  grid-template-columns:
+    12px 1fr auto;
+
+  gap: 10px;
+
+  align-items: center;
+
+  min-height: 42px;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.07
+    );
+
+  font-family:
+    var(--cp-mono);
+
+  font-size: 8px;
+}
+
+.cp-operation-trace i {
+  width: 6px;
+  height: 6px;
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.35
+    );
+
+  border-radius: 50%;
+}
+
+.cp-operation-trace b {
+  font-size: 7px;
+  font-weight: 500;
+
+  opacity: 0.42;
+}
+
+.cp-operation-trace
+.is-complete i {
+  background:
+    rgba(
+      230,
+      238,
+      228,
+      0.70
+    );
+}
+
+.cp-operation-trace
+.is-running {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.94
+    );
+}
+
+.cp-operation-trace
+.is-running i {
+  background:
+    #e6eee4;
+
+  box-shadow:
+    0 0 0 5px
+    rgba(
+      230,
+      238,
+      228,
+      0.07
+    );
+
+  animation:
+    cp-v3-pulse
+    1.4s
+    ease-out
+    infinite;
+}
+
+.cp-operation-scan {
+  position: relative;
+
+  height: 24px;
+
+  margin-top: 14px;
+
+  overflow: hidden;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.06
+    );
+
+  border-bottom:rgba(
+      255,
+      255,
+      255,
+      0.06
+    );
+}
+
+.cp-operation-scan i {
+  position: absolute;
+
+  top: 0;
+  bottom: 0;
+
+  width: 22%;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(
+        230,
+        238,
+        228,
+        0.18
+      ),
+      transparent
+    );
+
+  animation:
+    cp-v3-scan
+    1.25s
+    linear
+    infinite;
+}
+
+/* ============================================================
+   03 / OPEN — minimal contextual HEAD instrument
+   ============================================================ */
+
+.cp-narrative--open {
+  top: 27%;
+  right: clamp(
+    48px,
+    4.7vw,
+    102px
+  );
+
+  width: 370px;
+
+  padding: 21px 23px;
+
+  border-top:
+    1px solid
+    rgba(
+      30,
+      37,
+      39,
+      0.55
+    );
+
+  border-bottom:
+    1px solid
+    rgba(
+      30,
+      37,
+      39,
+      0.20
+    );
+
+  color: #20272a;
+}
+
+.cp-narrative--open
+.cp-narrative__index {
+  color:
+    rgba(
+      24,
+      31,
+      33,
+      0.42
+    );
+}
+
+.cp-head-context {
+  display: grid;
+  gap: 7px;
+}
+
+.cp-head-context small {
+  font-family:
+    var(--cp-mono);
+
+  font-size: 8px;
+
+  opacity: 0.45;
+}
+
+.cp-head-context strong {
+  font-family:
+    var(--cp-halo);
+
+  font-size: 28px;
+  font-weight: 400;
+
+  line-height: 1;
+}
+
+.cp-head-context code {
+  font-family:
+    var(--cp-mono);
+
+  font-size: 9px;
+
+  opacity: 0.52;
+}
+
+.cp-head-result {
+  display: grid;
+
+  grid-template-columns:
+    94px 1fr;
+
+  gap: 18px;
+
+  align-items: end;
+
+  margin-top: 22px;
+  padding-top: 17px;
+
+  border-top:
+    1px solid
+    rgba(
+      25,
+      32,
+      34,
+      0.15
+    );
+}
+
+.cp-head-result > div {
+  display: grid;
+  gap: 3px;
+}
+
+.cp-head-result span {
+  font-family:
+    var(--cp-mono);
+
+  font-size: 7px;
+
+  opacity: 0.42;
+}
+
+.cp-head-result strong {
+  font-family:
+    var(--cp-halo);
+
+  font-size: 34px;
+  font-weight: 400;
+}
+
+.cp-head-result p {
+  margin: 0;
+
+  font-family:
+    var(--cp-body);
+
+  font-size: 11px;
+
+  line-height: 1.5;
+
+  opacity: 0.64;
+}
+
+.cp-narrative__action {
+  display: flex;
+
+  justify-content: space-between;
+  align-items: center;
+
+  width: 100%;
+
+  margin-top: 20px;
+  padding: 13px 0;
+
+  border: 0;
+
+  border-top:
+    1px solid
+    rgba(
+      25,
+      32,
+      34,
+      0.18
+    );
+
+  border-bottom:
+    1px solid
+    rgba(
+      25,
+      32,
+      34,
+      0.18
+    );
+
+  background: transparent;
+
+  color: inherit;
+
+  cursor: pointer;
+
+  pointer-events: auto;
+
+  font-family:
+    var(--cp-body);
+
+  font-size: 10px;
+  font-weight: 600;
+
+  text-align: left;
+}
+
+.cp-narrative__action b {
+  font-size: 15px;
+  font-weight: 400;
+
+  transition:
+    transform
+    220ms
+    ease;
+}
+
+.cp-narrative__action:hover b {
+  transform:
+    translateX(5px);
+}
+
+/* ============================================================
+   04 / INSPECT — single evidence ticket
+   ============================================================ */
+
+.cp-narrative--inspect {
+  top: 23%;
+  right: clamp(
+    46px,
+    4.4vw,
+    94px
+  );
+
+  width: 420px;
+}
+
+.cp-test-ticket {
+  padding: 23px 25px 22px;
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.10
+    );
+
+  background:
+    rgba(
+      14,
+      19,
+      21,
+      0.80
+    );
+
+  backdrop-filter:
+    blur(12px);
+
+  box-shadow:
+    0 18px 55px
+    rgba(
+      0,
+      0,
+      0,
+      0.09
+    );
+}
+
+.cp-test-ticket::before {
+  content: "";
+
+  display: block;
+
+  width: 46px;
+  height: 1px;
+
+  margin:
+    -23px 0
+    22px -25px;
+
+  background:
+    rgba(
+      227,
+      237,
+      224,
+      0.82
+    );
+}
+
+.cp-test-ticket__top {
+  display: flex;
+
+  justify-content: space-between;
+
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.40
+    );
+
+  font-family:
+    var(--cp-mono);
+
+  font-size: 8px;
+
+  letter-spacing: 0.10em;
+}
+
+.cp-test-ticket__top b {
+  color:
+    rgba(
+      226,
+      237,
+      223,
+      0.80
+    );
+
+  font-weight: 500;
+}
+
+.cp-test-ticket__title {
+  display: grid;
+  gap: 6px;
+
+  margin-top: 24px;
+}
+
+.cp-test-ticket__title small {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.38
+    );
+
+  font-family:
+    var(--cp-mono);
+
+  font-size: 8px;
+}
+
+.cp-test-ticket__title strong {
+  max-width: 320px;
+
+  font-family:
+    var(--cp-halo);
+
+  font-size: 31px;
+  font-weight: 400;
+
+  line-height: 0.96;
+
+  letter-spacing: -0.03em;
+}
+
+.cp-test-ticket__path {
+  display: block;
+
+  margin-top: 21px;
+  padding: 13px 0;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.07
+    );
+
+  border-bottom:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.07
+    );
+
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.78
+    );
+
+  font-family:
+    var(--cp-mono);
+
+  font-size: 10px;
+}
+
+.cp-test-ticket__facts {
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  margin-top: 15px;
+}
+
+.cp-test-ticket__facts > span {
+  display: grid;
+  gap: 6px;
+
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.36
+    );
+
+  font-family:
+    var(--cp-mono);
+
+  font-size: 7px;
+}
+
+.cp-test-ticket__facts > span + span {
+  padding-left: 20px;
+
+  border-left:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.08
+    );
+}
+
+.cp-test-ticket__facts strong {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.93
+    );
+
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.cp-test-ticket__next {
+  position: relative;
+
+  display: grid;
+  gap: 5px;
+
+  margin-top: 20px;
+  padding-top: 15px;
+  padding-right: 26px;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.08
+    );
+}
+
+.cp-test-ticket__next small {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.32
+    );
+
+  font-family:
+    var(--cp-mono);
+
+  font-size: 7px;
+}
+
+.cp-test-ticket__next strong {
+  font-family:
+    var(--cp-body);
+
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cp-test-ticket__next > span {
+  position: absolute;
+
+  right: 0;
+  bottom: 2px;
+
+  font-size: 18px;
+
+  opacity: 0.55;
+}
+
+/* ============================================================
+   Shared chapter progress
+   ============================================================ */
+
+.cp-narrative__progress {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 5px;
+
+  margin-top: 19px;
+}
+
+.cp-narrative__progress i {
+  height: 2px;
+
+  background:
+    rgba(
+      90,
+      101,
+      104,
+      0.20
+    );
+}
+
+.cp-narrative--transition
+.cp-narrative__progress i,
+.cp-narrative--inspect
+.cp-narrative__progress i {
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.10
+    );
+}
+
+.cp-narrative__progress
+i.is-complete {
+  background:
+    rgba(
+      173,
+      186,
+      178,
+      0.48
+    );
+}
+
+.cp-narrative__progress
+i.is-active {
+  background:
+    rgba(
+      226,
+      237,
+      223,
+      0.92
+    );
+
+  animation:
+    cp-v3-active-line
+    700ms
+    ease-out
+    both;
+}
+
+/* ============================================================
+   Motion
+   ============================================================ */
+
+@keyframes cp-v3-enter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(14px);
+
+    filter:
+      blur(5px);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+
+    filter:
+      blur(0);
+  }
+}
+
+@keyframes cp-v3-grow-y {
+  from {
+    transform:
+      scaleY(0);
+  }
+
+  to {
+    transform:
+      scaleY(1);
+  }
+}
+
+@keyframes cp-v3-pulse {
+  0% {
+    box-shadow:
+      0 0 0 0
+      rgba(
+        230,
+        238,
+        228,
+        0.20
+      );
+  }
+
+  70% {
+    box-shadow:
+      0 0 0 8px
+      rgba(
+        230,
+        238,
+        228,
+        0
+      );
+  }
+
+  100% {
+    box-shadow:
+      0 0 0 8px
+      rgba(
+        230,
+        238,
+        228,
+        0
+      );
+  }
+}
+
+@keyframes cp-v3-scan {
+  from {
+    transform:
+      translateX(-120%);
+  }
+
+  to {
+    transform:
+      translateX(520%);
+  }
+}
+
+@keyframes cp-v3-active-line {
+  from {
+    transform:
+      scaleX(0);
+
+    transform-origin: left;
+  }
+
+  to {
+    transform:
+      scaleX(1);
+
+    transform-origin: left;
+  }
+}
+
+/* ============================================================
+   Large desktop
+   ============================================================ */
+
+@media (min-width: 1600px) {
+  .cp-narrative--idle {
+    width: 380px;
+  }
+
+  .cp-narrative--transition {
+    width: 420px;
+  }
+
+  .cp-narrative--open {
+    width: 400px;
+  }
+
+  .cp-narrative--inspect {
+    width: 450px;
+  }
+
+  .cp-test-ticket__title strong {
+    font-size: 34px;
+  }
+}

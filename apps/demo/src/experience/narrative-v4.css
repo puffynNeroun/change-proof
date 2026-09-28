@@ -1,0 +1,1451 @@
+@import "./narrative-v3.css";
+
+/* ============================================================
+   CHANGE PROOF — NARRATIVE V4 / PASS 1
+
+   Principle:
+   UI enters -> does one semantic job -> leaves.
+
+   V3 remains underneath temporarily only so the untouched
+   INSPECT state keeps its existing styling during this pass.
+   ============================================================ */
+
+
+/* ------------------------------------------------------------
+   LEGACY SYSTEMS — visually retire them without deleting yet
+   ------------------------------------------------------------ */
+
+.cp-spec-card,
+.cp-annotation,
+.cp-right-rail,
+.cp-open-ui,
+.cp-proof-overlay {
+  display: none !important;
+}
+
+
+/* ------------------------------------------------------------
+   CHROME — reduce persistent HUD noise
+   ------------------------------------------------------------ */
+
+.cp-chrome__status,
+.cp-footer {
+  display: none !important;
+}
+
+
+/* ------------------------------------------------------------
+   HERO — machine becomes primary, copy becomes context
+   ------------------------------------------------------------ */
+
+.cp-experience[data-phase="intro"] .cp-hero-copy,
+.cp-experience[data-phase="idle"] .cp-hero-copy {
+  left: clamp(38px, 3.4vw, 74px);
+
+  width:
+    min(
+      430px,
+      29vw
+    );
+}
+
+.cp-experience[data-phase="intro"]
+.cp-hero-copy h1.cp-display-title,
+.cp-experience[data-phase="idle"]
+.cp-hero-copy h1.cp-display-title {
+  font-size:
+    clamp(
+      48px,
+      3.75vw,
+      72px
+    );
+
+  line-height: 0.94;
+  letter-spacing: -0.045em;
+}
+
+.cp-experience[data-phase="intro"] .cp-hero-copy p,
+.cp-experience[data-phase="idle"] .cp-hero-copy p {
+  width: min(300px, 100%);
+
+  margin-top: 22px;
+
+  font-size: 11px;
+  line-height: 1.55;
+
+  opacity: 0.68;
+}
+
+.cp-experience[data-phase="intro"] .cp-primary-action,
+.cp-experience[data-phase="idle"] .cp-primary-action {
+  width: min(240px, 100%);
+
+  margin-top: 24px;
+
+  opacity: 0.82;
+}
+
+
+/*
+ * The old vignette was designed around the oversized headline.
+ * Keep readable contrast without making the left side a black wall.
+ */
+
+.cp-experience[data-phase="intro"] .cp-vignette,
+.cp-experience[data-phase="idle"] .cp-vignette {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(8, 13, 15, 0.78) 0%,
+      rgba(9, 14, 16, 0.58) 16%,
+      rgba(11, 16, 18, 0.26) 31%,
+      rgba(12, 17, 19, 0.06) 43%,
+      transparent 52%
+    );
+}
+
+
+/* ============================================================
+   V4 COMMON
+   ============================================================ */
+
+.cp-v4 {
+  position: absolute;
+
+  z-index: 26;
+
+  pointer-events: none;
+
+  font-family: var(--cp-body);
+
+  animation:
+    cp-v4-enter
+    420ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+.cp-v4__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  margin-bottom: 14px;
+
+  font-family: var(--cp-mono);
+
+  font-size: 8px;
+  line-height: 1;
+
+  letter-spacing: 0.13em;
+
+  opacity: 0.50;
+}
+
+.cp-v4__eyebrow > span:first-child {
+  opacity: 0.62;
+}
+
+
+/* ============================================================
+   01 / IDLE — spatial Shipping annotation
+   ============================================================ */
+
+.cp-narrative--idle.cp-v4--idle {
+  top: 31%;
+
+  right:
+    clamp(
+      48px,
+      5.5vw,
+      118px
+    );
+
+  width: 286px;
+
+  padding: 0 0 0 17px;
+
+  border: 0;
+  border-left:
+    1px solid
+    rgba(27, 34, 37, 0.34);
+
+  background: transparent;
+
+  color: #20282b;
+}
+
+
+/* registration leader toward the physical Shipping row */
+
+.cp-v4--idle::before {
+  content: "";
+
+  position: absolute;
+
+  top: 61px;
+  left: -116px;
+
+  width: 100px;
+  height: 1px;
+
+  background:
+    rgba(27, 34, 37, 0.30);
+}
+
+.cp-v4--idle::after {
+  content: "";
+
+  position: absolute;
+
+  top: 59px;
+  left: -119px;
+
+  width: 5px;
+  height: 5px;
+
+  border:
+    1px solid
+    rgba(27, 34, 37, 0.58);
+
+  border-radius: 50%;
+}
+
+
+.cp-v4__idle-title {
+  display: grid;
+  gap: 5px;
+}
+
+.cp-v4__idle-title small {
+  font-family: var(--cp-mono);
+
+  font-size: 7px;
+
+  letter-spacing: 0.11em;
+
+  opacity: 0.47;
+}
+
+.cp-v4__idle-title strong {
+  font-family: var(--cp-halo);
+
+  font-size: 31px;
+  font-weight: 400;
+
+  line-height: 0.96;
+
+  letter-spacing: -0.035em;
+}
+
+.cp-v4__idle-title p {
+  margin: 1px 0 0;
+
+  font-size: 11px;
+  line-height: 1.4;
+
+  opacity: 0.58;
+}
+
+
+.cp-v4__delta {
+  display: grid;
+
+  grid-template-columns:
+    1fr
+    auto
+    1fr;
+
+  gap: 11px;
+
+  align-items: end;
+
+  margin-top: 20px;
+  padding-top: 12px;
+
+  border-top:
+    1px solid
+    rgba(26, 33, 36, 0.15);
+}
+
+.cp-v4__delta-side {
+  display: grid;
+  gap: 4px;
+}
+
+.cp-v4__delta-side:last-child {
+  text-align: right;
+}
+
+.cp-v4__delta-side small {
+  font-family: var(--cp-mono);
+
+  font-size: 7px;
+
+  letter-spacing: 0.10em;
+
+  opacity: 0.42;
+}
+
+.cp-v4__delta-side strong {
+  font-family: var(--cp-halo);
+
+  font-size: 24px;
+  font-weight: 400;
+
+  line-height: 1;
+}
+
+.cp-v4__delta-arrow {
+  padding-bottom: 2px;
+
+  font-family: var(--cp-mono);
+  font-size: 11px;
+
+  opacity: 0.42;
+}
+
+
+.cp-v4__meta {
+  display: flex;
+  gap: 27px;
+
+  margin-top: 11px;
+}
+
+.cp-v4__meta span {
+  display: grid;
+  gap: 3px;
+
+  font-family: var(--cp-mono);
+
+  font-size: 7px;
+
+  letter-spacing: 0.08em;
+
+  opacity: 0.50;
+}
+
+.cp-v4__meta b {
+  font-size: 9px;
+  font-weight: 500;
+
+  letter-spacing: 0;
+
+  opacity: 1;
+}
+
+
+/* ============================================================
+   02 / TRANSITION — transient operation cues
+   No card. No permanent panel.
+   ============================================================ */
+
+.cp-narrative--transition.cp-v4--transition {
+  top: 34%;
+
+  right:
+    clamp(
+      52px,
+      5.6vw,
+      122px
+    );
+
+  width: 310px;
+
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+
+  backdrop-filter: none;
+
+  color:
+    rgba(
+      246,
+      248,
+      245,
+      0.96
+    );
+}
+
+
+.cp-v4__cue {
+  position: absolute;
+
+  top: 0;
+  right: 0;
+
+  width: 100%;
+
+  padding-left: 18px;
+
+  border-left:
+    1px solid
+    rgba(245, 248, 246, 0.32);
+
+  opacity: 0;
+
+  transform:
+    translateY(8px);
+}
+
+.cp-v4__cue::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: -1px;
+
+  width: 1px;
+  height: 26px;
+
+  background:
+    rgba(245, 248, 246, 0.92);
+}
+
+.cp-v4__cue small {
+  display: block;
+
+  margin-bottom: 7px;
+
+  font-family: var(--cp-mono);
+
+  font-size: 8px;
+
+  letter-spacing: 0.13em;
+
+  opacity: 0.46;
+}
+
+.cp-v4__cue strong {
+  display: block;
+
+  font-family: var(--cp-halo);
+
+  font-size: 27px;
+  font-weight: 400;
+
+  line-height: 0.98;
+
+  letter-spacing: -0.025em;
+}
+
+
+/*
+ * Shipping film duration: ~4.1667 s.
+ * Each cue owns one semantic section of the mechanical move.
+ */
+
+.cp-v4__cue--isolate {
+  animation:
+    cp-v4-cue-isolate
+    4.16s
+    linear
+    both;
+}
+
+.cp-v4__cue--open {
+  animation:
+    cp-v4-cue-open
+    4.16s
+    linear
+    both;
+}
+
+.cp-v4__cue--test {
+  animation:
+    cp-v4-cue-test
+    4.16s
+    linear
+    both;
+}
+
+
+/* ============================================================
+   03 / OPEN — machine is the evidence
+   ============================================================ */
+
+.cp-narrative--open.cp-v4--open {
+  top: 34%;
+
+  right:
+    clamp(
+      50px,
+      5.5vw,
+      120px
+    );
+
+  width: 304px;
+
+  padding: 0 0 0 17px;
+
+  border: 0;
+  border-left:
+    1px solid
+    rgba(27, 34, 37, 0.34);
+
+  background: transparent;
+
+  color: #20282b;
+}
+
+
+.cp-v4__open-status {
+  display: grid;
+  gap: 5px;
+}
+
+.cp-v4__open-status small {
+  font-family: var(--cp-mono);
+
+  font-size: 8px;
+
+  letter-spacing: 0.11em;
+
+  opacity: 0.45;
+}
+
+.cp-v4__open-status strong {
+  font-family: var(--cp-halo);
+
+  font-size: 29px;
+  font-weight: 400;
+
+  line-height: 1;
+
+  letter-spacing: -0.03em;
+}
+
+.cp-v4__open-status p {
+  width: 245px;
+
+  margin: 4px 0 0;
+
+  font-size: 11px;
+  line-height: 1.45;
+
+  opacity: 0.58;
+}
+
+
+.cp-v4__action {
+  display: flex;
+
+  justify-content: space-between;
+  align-items: center;
+
+  width: 100%;
+
+  margin-top: 21px;
+  padding: 12px 0;
+
+  border: 0;
+
+  border-top:
+    1px solid
+    rgba(27, 34, 37, 0.16);
+
+  border-bottom:
+    1px solid
+    rgba(27, 34, 37, 0.16);
+
+  background: transparent;
+
+  color: inherit;
+
+  cursor: pointer;
+
+  pointer-events: auto;
+
+  font-family: var(--cp-body);
+
+  font-size: 10px;
+  font-weight: 600;
+
+  text-align: left;
+}
+
+.cp-v4__action b {
+  font-size: 15px;
+  font-weight: 400;
+
+  transition:
+    transform
+    200ms
+    ease;
+}
+
+.cp-v4__action:hover b {
+  transform:
+    translateX(5px);
+}
+
+
+/* ------------------------------------------------------------
+   OPEN and TRANSITION should not compete with the machine
+   ------------------------------------------------------------ */
+
+.cp-experience[data-phase="transition"] .cp-hero-copy,
+.cp-experience[data-phase="open"] .cp-hero-copy,
+.cp-experience[data-phase="inspect"] .cp-hero-copy {
+  opacity: 0 !important;
+
+  pointer-events: none;
+}
+
+
+/* ============================================================
+   MOTION
+   ============================================================ */
+
+@keyframes cp-v4-enter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+  }
+}
+
+
+@keyframes cp-v4-cue-isolate {
+  0%,
+  4% {
+    opacity: 0;
+
+    transform:
+      translateY(8px);
+  }
+
+  8%,
+  22% {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+  }
+
+  29%,
+  100% {
+    opacity: 0;
+
+    transform:
+      translateY(-7px);
+  }
+}
+
+
+@keyframes cp-v4-cue-open {
+  0%,
+  27% {
+    opacity: 0;
+
+    transform:
+      translateY(8px);
+  }
+
+  34%,
+  56% {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+  }
+
+  64%,
+  100% {
+    opacity: 0;
+
+    transform:
+      translateY(-7px);
+  }
+}
+
+
+@keyframes cp-v4-cue-test {
+  0%,
+  59% {
+    opacity: 0;
+
+    transform:
+      translateY(8px);
+  }
+
+  66%,
+  89% {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+  }
+
+  96%,
+  100% {
+    opacity: 0;
+
+    transform:
+      translateY(-7px);
+  }
+}
+
+
+/* ============================================================
+   RESPONSIVE SAFETY
+   ============================================================ */
+
+@media (max-width: 1100px) {
+  .cp-narrative--idle.cp-v4--idle,
+  .cp-narrative--transition.cp-v4--transition,
+  .cp-narrative--open.cp-v4--open {
+    right: 32px;
+
+    width: 260px;
+  }
+
+  .cp-v4--idle::before,
+  .cp-v4--idle::after {
+    display: none;
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-v4,
+  .cp-v4__cue {
+    animation-duration: 1ms !important;
+  }
+}
+
+
+/* ============================================================
+   CHANGE PROOF — CINEMATIC COORDINATE PLANE V1
+
+   Machine-bound interaction must use the same authored 16:9
+   geometry as IDLE / VIDEO / OPEN.
+
+   Global hero/chrome remain viewport-relative.
+   ============================================================ */
+
+.cp-experience {
+  --cp-cinematic-w:
+    min(
+      100vw,
+      calc(100vh * 16 / 9)
+    );
+
+  --cp-cinematic-h:
+    min(
+      100vh,
+      calc(100vw * 9 / 16)
+    );
+}
+
+
+/* ------------------------------------------------------------
+   Narrative coordinate plane
+
+   Same exact rectangle as the authored cinematic media.
+   ------------------------------------------------------------ */
+
+.cp-narrative-shell {
+  inset: auto;
+
+  top:
+    calc(
+      (100vh - var(--cp-cinematic-h))
+      / 2
+    );
+
+  left:
+    calc(
+      (100vw - var(--cp-cinematic-w))
+      / 2
+    );
+
+  width:
+    var(--cp-cinematic-w);
+
+  height:
+    var(--cp-cinematic-h);
+
+  transform: none;
+}
+
+
+/* ------------------------------------------------------------
+   Shipping hit target
+
+   The button itself becomes the authored 16:9 plane.
+   clip-path restricts hit-testing to the real Shipping row.
+
+   Normalized Shipping row:
+   x ≈ 44.2% .. 66.7%
+   y ≈ 44.2% .. 52.7%
+   ------------------------------------------------------------ */
+
+.cp-shipping-hotspot {
+  inset: auto;
+
+  top:
+    calc(
+      (100vh - var(--cp-cinematic-h))
+      / 2
+    );
+
+  left:
+    calc(
+      (100vw - var(--cp-cinematic-w))
+      / 2
+    );
+
+  width:
+    var(--cp-cinematic-w);
+
+  height:
+    var(--cp-cinematic-h);
+
+  transform: none;
+
+  clip-path:
+    inset(
+      44.2%
+      33.3%
+      47.3%
+      44.2%
+      round 3px
+    );
+}
+
+
+/*
+ * V4 owns the visible annotation.
+ * Legacy hotspot label/leader must not create another UI layer.
+ */
+
+.cp-hotspot__line,
+.cp-hotspot__label {
+  display: none !important;
+}
+
+
+/*
+ * Temporary visual validation:
+ * when you hover the real clickable Shipping zone,
+ * only that registered region gets a very light blue wash.
+ *
+ * We remove this after alignment is accepted.
+ */
+
+.cp-experience[data-phase="idle"]
+.cp-shipping-hotspot:hover {
+  background:
+    rgba(
+      42,
+      108,
+      220,
+      0.09
+    );
+}
+
+
+/* ------------------------------------------------------------
+   V4 positions are now relative to cinematic plane,
+   not to browser viewport.
+   ------------------------------------------------------------ */
+
+.cp-narrative-shell
+.cp-narrative--idle.cp-v4--idle {
+  top: 31%;
+  right: 4.5%;
+}
+
+.cp-narrative-shell
+.cp-narrative--transition.cp-v4--transition {
+  top: 34%;
+  right: 4.5%;
+}
+
+.cp-narrative-shell
+.cp-narrative--open.cp-v4--open {
+  top: 34%;
+  right: 4.5%;
+}
+
+
+/* Safety on very wide screens */
+
+@media (min-aspect-ratio: 19 / 9) {
+  .cp-narrative-shell
+  .cp-narrative--idle.cp-v4--idle,
+  .cp-narrative-shell
+  .cp-narrative--transition.cp-v4--transition,
+  .cp-narrative-shell
+  .cp-narrative--open.cp-v4--open {
+    right: 3.5%;
+  }
+}
+
+
+/* ============================================================
+   CHANGE PROOF — NARRATIVE V4 / PASS 2 COMPOSITION
+   ============================================================ */
+
+
+/* ------------------------------------------------------------
+   Remove coordinate-plane debug visualization
+   ------------------------------------------------------------ */
+
+.cp-experience[data-phase="idle"]
+.cp-shipping-hotspot:hover {
+  background: transparent !important;
+}
+
+
+/* ============================================================
+   INTRO -> IDLE are two different narrative jobs
+   ============================================================ */
+
+.cp-intro-story,
+.cp-idle-story {
+  transition:
+    opacity 420ms ease,
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+
+/* INTRO */
+
+.cp-experience[data-phase="intro"]
+.cp-intro-story {
+  opacity: 1;
+
+  transform:
+    translateY(0);
+
+  pointer-events: auto;
+}
+
+.cp-experience[data-phase="intro"]
+.cp-idle-story {
+  opacity: 0;
+
+  transform:
+    translateY(14px);
+
+  pointer-events: none;
+}
+
+
+/* IDLE */
+
+.cp-experience[data-phase="idle"]
+.cp-intro-story {
+  opacity: 0;
+
+  transform:
+    translateY(-12px);
+
+  pointer-events: none;
+}
+
+.cp-experience[data-phase="idle"]
+.cp-idle-story {
+  opacity: 1;
+
+  transform:
+    translateY(0);
+
+  pointer-events: auto;
+}
+
+
+/* ------------------------------------------------------------
+   IDLE experiment brief
+   ------------------------------------------------------------ */
+
+.cp-idle-story {
+  position: absolute;
+
+  top: 50%;
+  left: 0;
+
+  width: min(390px, 29vw);
+
+  transform:
+    translateY(-50%);
+}
+
+.cp-idle-story h2 {
+  max-width: 390px;
+
+  margin: 0;
+
+  color:
+    rgba(
+      246,
+      248,
+      245,
+      0.97
+    );
+
+  font-family: var(--cp-halo);
+
+  font-size:
+    clamp(
+      33px,
+      2.55vw,
+      47px
+    );
+
+  font-weight: 400;
+
+  line-height: 0.98;
+
+  letter-spacing: -0.04em;
+}
+
+.cp-idle-story > p {
+  max-width: 330px;
+
+  margin: 20px 0 0 !important;
+
+  color:
+    rgba(
+      244,
+      247,
+      244,
+      0.66
+    );
+
+  font-size: 12px !important;
+  line-height: 1.62 !important;
+}
+
+
+.cp-idle-story__facts {
+  display: grid;
+
+  grid-template-columns:
+    1fr
+    1fr;
+
+  gap: 24px;
+
+  width: 300px;
+
+  margin-top: 24px;
+  padding-top: 13px;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.15
+    );
+}
+
+.cp-idle-story__facts span {
+  display: grid;
+  gap: 6px;
+}
+
+.cp-idle-story__facts small {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.42
+    );
+
+  font-family: var(--cp-mono);
+
+  font-size: 7px;
+
+  letter-spacing: 0.11em;
+}
+
+.cp-idle-story__facts strong {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.88
+    );
+
+  font-family: var(--cp-mono);
+
+  font-size: 10px;
+  font-weight: 500;
+}
+
+
+/*
+ * Primary action is now an experiment action,
+ * not another marketing CTA.
+ */
+
+.cp-experience[data-phase="idle"]
+.cp-primary-action {
+  display: flex;
+
+  justify-content: space-between;
+  align-items: center;
+
+  width: 300px;
+
+  margin-top: 23px;
+  padding: 12px 0;
+
+  border: 0;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.18
+    );
+
+  border-bottom:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.18
+    );
+
+  background: transparent;
+
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.88
+    );
+
+  cursor: pointer;
+
+  font-family: var(--cp-mono);
+
+  font-size: 8px;
+
+  letter-spacing: 0.10em;
+}
+
+.cp-experience[data-phase="idle"]
+.cp-primary-action:hover {
+  border-color:
+    rgba(
+      255,
+      255,
+      255,
+      0.36
+    );
+}
+
+
+/* ============================================================
+   IDLE — physical Shipping affordance
+   ============================================================ */
+
+.cp-narrative-shell
+.cp-narrative--idle.cp-v4--idle {
+  top: 32.5%;
+  left: 69.2%;
+  right: auto;
+
+  width: 264px;
+}
+
+
+/*
+ * Short registration leader.
+ * Cobalt exists only at the actual interaction coordinate.
+ */
+
+.cp-v4--idle::before {
+  top: 64px;
+  left: -126px;
+
+  width: 108px;
+
+  background:
+    rgba(
+      35,
+      43,
+      47,
+      0.34
+    );
+}
+
+.cp-v4--idle::after {
+  top: 61px;
+  left: -131px;
+
+  width: 6px;
+  height: 6px;
+
+  border: 0;
+
+  background: #376fd0;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(
+      55,
+      111,
+      208,
+      0.10
+    );
+}
+
+
+.cp-v4__select-action {
+  display: flex;
+
+  justify-content: space-between;
+  align-items: center;
+
+  width: 100%;
+
+  margin-top: 17px;
+  padding: 11px 0;
+
+  border: 0;
+
+  border-top:
+    1px solid
+    rgba(
+      26,
+      33,
+      36,
+      0.16
+    );
+
+  border-bottom:
+    1px solid
+    rgba(
+      26,
+      33,
+      36,
+      0.16
+    );
+
+  background: transparent;
+
+  color: #20282b;
+
+  cursor: pointer;
+
+  pointer-events: auto;
+
+  font-family: var(--cp-mono);
+
+  font-size: 8px;
+  font-weight: 600;
+
+  letter-spacing: 0.08em;
+
+  text-align: left;
+}
+
+.cp-v4__select-action b {
+  color: #376fd0;
+
+  font-size: 14px;
+  font-weight: 400;
+
+  transition:
+    transform
+    180ms
+    ease;
+}
+
+.cp-v4__select-action:hover b {
+  transform:
+    translateX(5px);
+}
+
+
+/*
+ * Hovering the physical Shipping row reinforces only the
+ * annotation coordinate — never fills the row with blue.
+ */
+
+.cp-experience:has(.cp-shipping-hotspot:hover)
+.cp-v4--idle::after {
+  background: #2f66c7;
+
+  transform:
+    scale(1.22);
+}
+
+.cp-experience:has(.cp-shipping-hotspot:hover)
+.cp-v4__select-action {
+  border-color:
+    rgba(
+      47,
+      102,
+      199,
+      0.34
+    );
+}
+
+
+/* ============================================================
+   TRANSITION — stronger, closer spatial cues
+   ============================================================ */
+
+.cp-narrative-shell
+.cp-narrative--transition.cp-v4--transition {
+  top: 34%;
+  left: 69.7%;
+  right: auto;
+
+  width: 285px;
+}
+
+.cp-v4__cue {
+  padding-left: 16px;
+}
+
+.cp-v4__cue::after {
+  content: "";
+
+  position: absolute;
+
+  top: 29px;
+  right: calc(100% + 16px);
+
+  width: 86px;
+  height: 1px;
+
+  background:
+    rgba(
+      245,
+      248,
+      246,
+      0.28
+    );
+}
+
+.cp-v4__cue strong {
+  font-size: 31px;
+
+  line-height: 0.96;
+}
+
+.cp-v4__cue small {
+  font-size: 8px;
+
+  opacity: 0.54;
+}
+
+
+/* ============================================================
+   OPEN — small confirmation attached to evidence, not dashboard
+   ============================================================ */
+
+.cp-narrative-shell
+.cp-narrative--open.cp-v4--open {
+  top: 30.5%;
+  left: 69.2%;
+  right: auto;
+
+  width: 286px;
+}
+
+.cp-v4--open::before {
+  content: "";
+
+  position: absolute;
+
+  top: 54px;
+  left: -116px;
+
+  width: 98px;
+  height: 1px;
+
+  background:
+    rgba(
+      27,
+      34,
+      37,
+      0.27
+    );
+}
+
+.cp-v4--open::after {
+  content: "";
+
+  position: absolute;
+
+  top: 51px;
+  left: -121px;
+
+  width: 6px;
+  height: 6px;
+
+  border-radius: 50%;
+
+  background:
+    rgba(
+      40,
+      92,
+      61,
+      0.78
+    );
+}
+
+.cp-v4__open-status strong {
+  font-size: 32px;
+}
+
+.cp-v4__open-status p {
+  max-width: 240px;
+
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+
+/* ============================================================
+   IDLE viewport safety
+   ============================================================ */
+
+@media (max-width: 1250px) {
+  .cp-idle-story {
+    width: 320px;
+  }
+
+  .cp-idle-story h2 {
+    font-size: 34px;
+  }
+
+  .cp-narrative-shell
+  .cp-narrative--idle.cp-v4--idle,
+  .cp-narrative-shell
+  .cp-narrative--transition.cp-v4--transition,
+  .cp-narrative-shell
+  .cp-narrative--open.cp-v4--open {
+    left: 68%;
+    width: 245px;
+  }
+}

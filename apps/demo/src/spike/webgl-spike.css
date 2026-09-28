@@ -1,0 +1,245 @@
+.cp-webgl-spike,
+.cp-webgl-spike * {
+  box-sizing: border-box;
+}
+
+.cp-webgl-spike {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  overflow: hidden;
+  background: #e7e1d6;
+  color: #20292d;
+  font-family:
+    Inter,
+    Arial,
+    Helvetica,
+    sans-serif;
+}
+
+.cp-webgl-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.cp-webgl-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cp-spike-header {
+  position: absolute;
+  z-index: 10;
+  top: 28px;
+  right: 34px;
+  left: 34px;
+
+  display: flex;
+  justify-content: space-between;
+
+  pointer-events: none;
+}
+
+.cp-spike-header div {
+  display: grid;
+  gap: 5px;
+}
+
+.cp-spike-header strong {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.cp-spike-header span {
+  color: #626b6f;
+  font-size: 9px;
+  letter-spacing: 0.13em;
+}
+
+.cp-spike-header a {
+  color: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.cp-spike-copy {
+  position: absolute;
+  z-index: 10;
+
+  top: 50%;
+  left: clamp(30px, 5vw, 90px);
+
+  width: min(370px, 28vw);
+
+  transform: translateY(-50%);
+
+  pointer-events: none;
+}
+
+.cp-spike-copy > span {
+  display: block;
+  margin-bottom: 16px;
+
+  color: #606a6e;
+
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.cp-spike-copy h1 {
+  margin: 0;
+
+  font-size: clamp(38px, 4.2vw, 70px);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 0.91;
+}
+
+.cp-spike-copy p {
+  max-width: 310px;
+
+  margin: 24px 0 0;
+
+  color: #515b5f;
+
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cp-spike-debug {
+  position: absolute;
+  z-index: 10;
+
+  top: 92px;
+  right: 34px;
+
+  display: grid;
+  gap: 6px;
+
+  width: 170px;
+
+  padding: 12px;
+
+  border:
+    1px solid
+    rgba(32, 41, 45, 0.16);
+
+  background:
+    rgba(239, 234, 224, 0.84);
+
+  backdrop-filter: blur(12px);
+}
+
+.cp-spike-debug strong {
+  margin-bottom: 5px;
+
+  color: #626b6f;
+
+  font-size: 8px;
+  letter-spacing: 0.13em;
+}
+
+.cp-spike-debug button {
+  padding: 7px 8px;
+
+  border:
+    1px solid
+    rgba(32, 41, 45, 0.18);
+
+  background: transparent;
+
+  color: #20292d;
+
+  cursor: pointer;
+
+  font:
+    700 9px/1
+    monospace;
+
+  text-align: left;
+}
+
+.cp-spike-debug button:hover {
+  background:
+    rgba(32, 41, 45, 0.06);
+}
+
+.cp-spike-note {
+  position: absolute;
+  right: 34px;
+  bottom: 28px;
+
+  color: #687175;
+
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+
+  pointer-events: none;
+}
+
+.cp-spike-label {
+  display: grid;
+  gap: 4px;
+
+  min-width: 130px;
+
+  padding: 9px 11px;
+
+  border:
+    1px solid
+    rgba(32, 41, 45, 0.22);
+
+  background:
+    rgba(245, 241, 232, 0.95);
+
+  box-shadow:
+    0 8px 26px
+    rgba(32, 41, 45, 0.1);
+
+  white-space: nowrap;
+}
+
+.cp-spike-label strong {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.cp-spike-label span {
+  color: #3158d8;
+
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+}
+
+@media (max-width: 900px) {
+  .cp-spike-copy {
+    top: auto;
+    right: 24px;
+    bottom: 32px;
+    left: 24px;
+
+    width: auto;
+
+    transform: none;
+  }
+
+  .cp-spike-copy h1 {
+    font-size: 38px;
+  }
+
+  .cp-spike-copy p {
+    max-width: 330px;
+  }
+
+  .cp-spike-debug,
+  .cp-spike-note {
+    display: none;
+  }
+}

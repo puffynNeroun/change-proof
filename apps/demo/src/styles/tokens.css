@@ -1,0 +1,38 @@
+@font-face {
+  font-family:Ubuntu;
+  src:url('/fonts/Ubuntu-Variable.ttf') format('truetype');
+  font-style:normal;
+  font-weight:100 900;
+  font-display:swap;
+}
+
+@font-face {
+  font-family:'Ubuntu Mono';
+  src:url('/fonts/UbuntuMono-R.ttf') format('truetype');
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+}
+
+:root {
+  /* Graphite, secondary ink, and mismatch match committed Run04 editorial values.
+     Ivory and selected green extend the accepted ceramic/test material language. */
+  --ivory:#f2f0e8;
+  --paper:#e8e7df;
+  --graphite:#20292d;
+  --muted:#4a575d;
+  --rule:#c9ccc5;
+  --selected:#d3e4ce;
+  --selected-ink:#284333;
+  --magenta:#ae668d;
+  --mono:'Ubuntu Mono',monospace;
+  --sans:Ubuntu,Arial,sans-serif;
+  --ease:cubic-bezier(.22,.68,.24,1);
+  font-family:var(--sans);
+  color:var(--graphite);
+  background:var(--ivory);
+  font-weight:500;
+  font-synthesis:none;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+}

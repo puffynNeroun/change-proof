@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 2,
+  "status": "single_gate_pass_pending_human_review",
+  "fps": 60,
+  "playbackRate": 1.0,
+  "proxy_resolution": [
+    1280,
+    480
+  ],
+  "evidence": {
+    "test": "test/checkout.test.js",
+    "input": 5000,
+    "expected": true,
+    "head": {
+      "operator": ">=",
+      "actual": true
+    },
+    "base": {
+      "operator": ">",
+      "actual": false
+    }
+  },
+  "films": {
+    "shipping": {
+      "scene": "M5_SHIPPING_60",
+      "frame_start": 1,
+      "frame_end": 246,
+      "frame_count": 246,
+      "duration_seconds": 4.1,
+      "events": [
+        {
+          "name": "shipping.start",
+          "blender_frame": 1,
+          "frame": 0,
+          "time_seconds": 0.0,
+          "time": {
+            "numerator": 0,
+            "denominator": 60
+          },
+          "normalized_progress": 0.0
+        },
+        {
+          "name": "shipping.module_active",
+          "blender_frame": 4,
+          "frame": 3,
+          "time_seconds": 0.05,
+          "time": {
+            "numerator": 3,
+            "denominator": 60
+          },
+          "normalized_progress": 0.012195121951219513
+        },
+        {
+          "name": "shipping.implementation_visible",
+          "blender_frame": 110,
+          "frame": 109,
+          "time_seconds": 1.8166666666666667,
+          "time": {
+            "numerator": 109,
+            "denominator": 60
+          },
+          "normalized_progress": 0.44308943089430897
+        },
+        {
+          "name": "shipping.selected_test_visible",
+          "blender_frame": 143,
+          "frame": 142,
+          "time_seconds": 2.3666666666666667,
+          "time": {
+            "numerator": 142,
+            "denominator": 60
+          },
+          "normalized_progress": 0.5772357723577236
+        },
+        {
+          "name": "shipping.head_registration",
+          "blender_frame": 229,
+          "frame": 228,
+          "time_seconds": 3.8,
+          "time": {
+            "numerator": 228,
+            "denominator": 60
+          },
+          "normalized_progress": 0.926829268292683
+        },
+        {
+          "name": "shipping.head_stable",
+          "blender_frame": 230,
+          "frame": 229,
+          "time_seconds": 3.816666666666667,
+          "time": {
+            "numerator": 229,
+            "denominator": 60
+          },
+          "normalized_progress": 0.9308943089430894
+        },
+        {
+          "name": "shipping.end",
+          "blender_frame": null,
+          "frame": 246,
+          "time_seconds": 4.1,
+          "time": {
+            "numerator": 246,
+            "denominator": 60
+          },
+          "normalized_progress": 1.0
+        }
+      ]
+    },
+    "base": {
+      "scene": "M5_HEAD_BASE_60",
+      "frame_start": 1,
+      "frame_end": 114,
+      "frame_count": 114,
+      "duration_seconds": 1.9,
+      "events": [
+        {
+          "name": "base.start",
+          "blender_frame": 1,
+          "frame": 0,
+          "time_seconds": 0.0,
+          "time": {
+            "numerator": 0,
+            "denominator": 60
+          },
+          "normalized_progress": 0.0
+        },
+        {
+          "name": "base.operator_release",
+          "blender_frame": 10,
+          "frame": 9,
+          "time_seconds": 0.15,
+          "time": {
+            "numerator": 9,
+            "denominator": 60
+          },
+          "normalized_progress": 0.07894736842105263
+        },
+        {
+          "name": "base.operator_edge",
+          "blender_frame": 31,
+          "frame": 30,
+          "time_seconds": 0.5,
+          "time": {
+            "numerator": 30,
+            "denominator": 60
+          },
+          "normalized_progress": 0.2631578947368421
+        },
+        {
+          "name": "base.revision_swap",
+          "blender_frame": 32,
+          "frame": 31,
+          "time_seconds": 0.5166666666666667,
+          "time": {
+            "numerator": 31,
+            "denominator": 60
+          },
+          "normalized_progress": 0.2719298245614035
+        },
+        {
+          "name": "base.operator_ready",
+          "blender_frame": 52,
+          "frame": 51,
+          "time_seconds": 0.85,
+          "time": {
+            "numerator": 51,
+            "denominator": 60
+          },
+          "normalized_progress": 0.4473684210526316
+        },
+        {
+          "name": "base.result_release",
+          "blender_frame": 46,
+          "frame": 45,
+          "time_seconds": 0.75,
+          "time": {
+            "numerator": 45,
+            "denominator": 60
+          },
+          "normalized_progress": 0.39473684210526316
+        },
+        {
+          "name": "base.evaluation",
+          "blender_frame": 62,
+          "frame": 61,
+          "time_seconds": 1.0166666666666666,
+          "time": {
+            "numerator": 61,
+            "denominator": 60
+          },
+          "normalized_progress": 0.5350877192982456
+        },
+        {
+          "name": "base.false_visible",
+          "blender_frame": 76,
+          "frame": 75,
+          "time_seconds": 1.25,
+          "time": {
+            "numerator": 75,
+            "denominator": 60
+          },
+          "normalized_progress": 0.6578947368421053
+        },
+        {
+          "name": "base.registration",
+          "blender_frame": 103,
+          "frame": 102,
+          "time_seconds": 1.7,
+          "time": {
+            "numerator": 102,
+            "denominator": 60
+          },
+          "normalized_progress": 0.8947368421052632
+        },
+        {
+          "name": "base.stable",
+          "blender_frame": 104,
+          "frame": 103,
+          "time_seconds": 1.7166666666666666,
+          "time": {
+            "numerator": 103,
+            "denominator": 60
+          },
+          "normalized_progress": 0.9035087719298246
+        },
+        {
+          "name": "base.end",
+          "blender_frame": null,
+          "frame": 114,
+          "time_seconds": 1.9,
+          "time": {
+            "numerator": 114,
+            "denominator": 60
+          },
+          "normalized_progress": 1.0
+        }
+      ]
+    }
+  }
+}
