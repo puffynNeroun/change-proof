@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f2f0e8" />
+    <meta name="description" content="Run the selected regression test against yesterday. Explore the exact BASE and HEAD evidence behind one shipping boundary change." />
+    <link rel="icon" type="image/svg+xml" href="./mark.svg" />
+    <title>Change Proof — Evidence Instrument</title>
+      <style>
+      html.cp-preboot,
+      html.cp-preboot body,
+      html.cp-preboot #root {
+        min-height: 100%;
+        background: #080a0b;
+      }
+
+      html.cp-preboot body {
+        margin: 0;
+      }
+    </style>
+
+    <script>
+      if (
+        new URLSearchParams(window.location.search)
+          .get('experience') === '1'
+      ) {
+        document.documentElement
+          .classList.add('cp-preboot');
+      }
+    </script>
+</head>
+  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+</html>
