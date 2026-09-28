@@ -1,0 +1,385 @@
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #dedbd3;
+}
+
+.cp-shipping-v2 {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-height: 720px;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 54% 42%,
+      rgba(255, 255, 255, 0.42),
+      transparent 42%
+    ),
+    #dedbd3;
+  color: #18191a;
+  font-family:
+    Inter,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
+.cp-shipping-v2__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.cp-shipping-v2__header {
+  position: absolute;
+  top: 32px;
+  left: 36px;
+  right: 36px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.cp-shipping-v2__eyebrow,
+.cp-shipping-v2__metrics,
+.cp-shipping-v2__footer {
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.cp-shipping-v2__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 700;
+}
+
+.cp-shipping-v2__eyebrow > span {
+  width: 36px;
+  height: 1px;
+  background: rgba(
+    24,
+    25,
+    26,
+    0.28
+  );
+}
+
+.cp-shipping-v2__metrics {
+  display: flex;
+  gap: 22px;
+  color: rgba(
+    24,
+    25,
+    26,
+    0.52
+  );
+}
+
+.cp-shipping-v2__evidence {
+  position: absolute;
+  z-index: 12;
+  top: 50%;
+  right: clamp(
+    34px,
+    4.5vw,
+    94px
+  );
+  width: clamp(
+    300px,
+    24vw,
+    420px
+  );
+  transform:
+    translateY(-50%);
+  pointer-events: none;
+}
+
+.cp-shipping-v2__evidence-kicker {
+  margin-bottom: 16px;
+  color: rgba(
+    24,
+    25,
+    26,
+    0.48
+  );
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.cp-shipping-v2__path {
+  margin-bottom: 8px;
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  font-size: 12px;
+  color: rgba(
+    24,
+    25,
+    26,
+    0.6
+  );
+}
+
+.cp-shipping-v2__evidence h1 {
+  max-width: 390px;
+  margin: 0;
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  font-size: clamp(
+    22px,
+    2vw,
+    34px
+  );
+  line-height: 1.02;
+  letter-spacing: -0.055em;
+  font-weight: 500;
+}
+
+.cp-shipping-v2__revision {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.cp-shipping-v2__revision span {
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  color: #315cdd;
+  letter-spacing: 0.04em;
+}
+
+.cp-shipping-v2__rule {
+  width: 100%;
+  height: 1px;
+  margin: 23px 0 20px;
+  background: rgba(
+    24,
+    25,
+    26,
+    0.17
+  );
+}
+
+.cp-shipping-v2__datum {
+  display: grid;
+  gap: 11px;
+}
+
+.cp-shipping-v2__datum > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.cp-shipping-v2__datum span {
+  overflow: hidden;
+  color: rgba(
+    24,
+    25,
+    26,
+    0.57
+  );
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-shipping-v2__datum strong {
+  flex: 0 0 auto;
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cp-shipping-v2__result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 24px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(
+    24,
+    25,
+    26,
+    0.14
+  );
+  border-bottom: 1px solid rgba(
+    24,
+    25,
+    26,
+    0.14
+  );
+}
+
+.cp-shipping-v2__result span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.cp-shipping-v2__result strong {
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  font-size: 16px;
+  font-weight: 500;
+  color: #315cdd;
+}
+
+.cp-shipping-v2__source {
+  display: flex;
+  gap: 12px;
+  margin-top: 15px;
+  color: rgba(
+    24,
+    25,
+    26,
+    0.42
+  );
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+
+.cp-shipping-v2__source span {
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.cp-surface-label {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 3px 5px;
+  color: #222526;
+  font-family:
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  filter:
+    drop-shadow(
+      0 1px 0
+      rgba(
+        255,
+        255,
+        255,
+        0.42
+      )
+    );
+}
+
+.cp-surface-label__index {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.66;
+}
+
+.cp-surface-label__name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.cp-shipping-v2__footer {
+  position: absolute;
+  z-index: 10;
+  left: 36px;
+  right: 36px;
+  bottom: 28px;
+  display: flex;
+  justify-content: space-between;
+  color: rgba(
+    24,
+    25,
+    26,
+    0.38
+  );
+  pointer-events: none;
+}
+
+@media (
+  max-width: 1050px
+) {
+  .cp-shipping-v2__evidence {
+    top: auto;
+    right: 26px;
+    bottom: 68px;
+    width: 310px;
+    transform: none;
+    padding: 18px;
+    background: rgba(
+      232,
+      229,
+      221,
+      0.82
+    );
+    backdrop-filter:
+      blur(14px);
+  }
+
+  .cp-shipping-v2__evidence h1 {
+    font-size: 20px;
+  }
+}
+
+/*
+ * SHIPPING V2 CAMERA VALIDATION
+ *
+ * Evidence UI is intentionally hidden for this
+ * visual gate. First prove the object / camera /
+ * material composition without overlay noise.
+ */
+.cp-shipping-v2__evidence {
+  display: none;
+}
