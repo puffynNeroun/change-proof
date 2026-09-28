@@ -1,0 +1,70 @@
+/* Fixed 2560 × 1440 calibration. All rules are scoped to this isolated route. */
+.v9-head {
+  --v9-sans: 'Sora Variable', Arial, sans-serif;
+  --v9-mono: 'IBM Plex Mono', monospace;
+  position: relative;
+  isolation: isolate;
+  width: 2560px;
+  height: 1440px;
+  overflow: hidden;
+  background: #a7b4ba;
+  color: #192c36;
+  font-family: var(--v9-sans);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+.v9-head *, .v9-head *::before, .v9-head *::after { box-sizing: border-box; }
+.v9-head__scene { position: absolute; inset: 0; width: 2560px; height: 1440px; max-width: none; z-index: -2; }
+.v9-head__tonal-field { position: absolute; left: -270px; top: 230px; width: 1100px; height: 1010px; background: radial-gradient(ellipse, #e9eeeb70, #dbe3e82e 42%, transparent 69%); z-index: -1; pointer-events: none; }
+.v9-head__masthead { position: absolute; top: 65px; left: 104px; right: 104px; display: flex; align-items: center; justify-content: space-between; }
+.v9-head__brand { display: flex; gap: 17px; align-items: center; font-size: 23px; letter-spacing: .025em; font-weight: 650; }
+.v9-head__brand svg { width: 34px; height: 34px; }
+.v9-head__context { font: 500 15px var(--v9-mono); letter-spacing: .09em; }
+.v9-head__context span { margin: 0 17px; opacity: .55; }
+.v9-head__narrative { position: absolute; top: 475px; left: 104px; width: 565px; }
+.v9-head__chapter { display: flex; align-items: center; gap: 20px; font: 500 16px var(--v9-mono); letter-spacing: .08em; }
+.v9-head__chapter span { display: inline-flex; align-items: center; justify-content: center; width: 39px; height: 31px; color: #f1f4ee; background: #253b46; border-radius: 5px; font-size: 14px; letter-spacing: 0; }
+.v9-head h1 { margin: 37px 0 32px; font: 480 76px/1.13 var(--v9-sans); letter-spacing: -3.2px; }
+.v9-head h1 em { font-style: normal; color: #185f49; }
+.v9-head__explanation { font-size: 25px; line-height: 1.6; letter-spacing: -.45px; color: #293e49; }
+.v9-lens { position: absolute; top: 300px; right: 160px; width: 480px; border: 1px solid #ffffff36; border-radius: 23px; color: #f0f3ef; background: linear-gradient(135deg, #303a40, #222b31 46%, #1d252b); box-shadow: 0 35px 70px -22px #14252b70, 0 4px 8px #26374026, inset 0 1px 0 #ffffff14; }
+.v9-lens__top { height: 80px; padding: 0 34px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #ffffff13; }
+.v9-lens__top h2 { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 500; letter-spacing: -.4px; }
+.v9-lens__top h2 svg { width: 24px; height: 24px; color: #b9c6cf; }
+.v9-head__registration { position: absolute; inset: 0; width: 2560px; height: 1440px; pointer-events: none; stroke: #344f6573; stroke-width: 1.25; }
+.v9-head__registration circle { fill: #e4e8e4; stroke: #344f65; }
+.v9-lens__body { padding: 35px 34px 38px; }
+.v9-lens__label { display: block; font: 400 14px/1.5 var(--v9-mono); letter-spacing: .075em; color: #c4cdd3; }
+.v9-lens__test { position: relative; padding: 0 0 25px; border-bottom: 1px solid #c0ced333; outline: none; }
+.v9-lens__test::before { content: ''; position: absolute; top: 7px; left: -35px; width: 19px; height: 20px; border-left: 2px solid #94b1e2; border-top: 2px solid #94b1e2; border-bottom: 2px solid #94b1e2; border-radius: 0 2px 2px 0; }
+.v9-lens__test:focus { outline: 2px solid #87aaff; outline-offset: 12px; }
+.v9-lens__filename { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+.v9-lens__filename svg { width: 23px; height: 23px; flex-shrink: 0; color: #95b2f7; }
+.v9-lens code { font-family: var(--v9-mono); }
+.v9-lens__filename code { font-size: 20px; letter-spacing: -.5px; white-space: nowrap; }
+.v9-lens__values { display: grid; grid-template-columns: 1fr 1fr; margin-top: 31px; }
+.v9-lens__values > div + div { padding-left: 28px; border-left: 1px solid #ffffff20; }
+.v9-lens__values strong { display: block; margin-top: 8px; font: 400 32px/1.25 var(--v9-mono); letter-spacing: -1px; }
+.v9-lens__comparison { position: relative; padding-top: 44px; }
+.v9-lens__comparison::before { content: ''; position: absolute; top: 0; left: calc(50% - 1px); width: 2px; height: 28px; background: #c2ccd3; }
+.v9-lens__shared { text-align: center; color: #f0f3ef; font: 500 19px/1.4 var(--v9-sans); letter-spacing: .07em; }
+.v9-lens__branches { display: block; width: 100%; height: 92px; margin-top: 13px; }
+.v9-lens__revisions { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.v9-lens__head-result { border-top: 2px solid #6e98ff; background: linear-gradient(#567cce20, transparent); padding: 23px 16px 16px; border-radius: 3px; }
+.v9-lens__base-result { border-top: 2px solid #77848c; padding: 23px 16px 16px; }
+.v9-lens__revision-label { font: 500 24px/1.3 var(--v9-sans); letter-spacing: .04em; color: #aac3ff; }
+.v9-lens__base-result .v9-lens__revision-label { color: #d0d8de; }
+.v9-lens__result { display: flex; align-items: center; gap: 9px; margin-top: 27px; }
+.v9-lens__result strong { font: 400 21px/1.4 var(--v9-sans); color: #a2dfb6; letter-spacing: -.5px; }
+.v9-lens__check { display: flex; width: 22px; height: 22px; border-radius: 50%; color: #a2dfb6; background: #8cdcaa15; border: 1px solid #96d9ad70; }
+.v9-lens__check svg { width: 22px; }
+.v9-lens__waiting { margin-top: 27px; font-size: 21px; line-height: 1.4; letter-spacing: -.5px; color: #d0d8de; }
+.v9-lens__result-caption { display: block; margin-top: 7px; color: #bec9d1; font-size: 16px; }
+.v9-lens__head-result .v9-lens__result-caption { margin-left: 31px; color: #a2c2ae; }
+.v9-lens__action { position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; height: 76px; padding: 0 34px; border-radius: 0 0 22px 22px; border: 0; border-top: 1px solid #8ba6db44; background: linear-gradient(100deg, #4675c81b, #4675c807); color: #ecf2ff; box-shadow: none; font: 500 15px var(--v9-sans); letter-spacing: .025em; cursor: pointer; }
+.v9-lens__action::before { content: ''; position: absolute; top: -1px; left: 34px; width: 48px; height: 2px; background: #7da3ff; }
+.v9-lens__arrow { width: 32px; height: 24px; color: #99b6ff; }
+.v9-lens__action:hover { background: #4a77c32a; color: #fff; }
+.v9-lens__action:hover .v9-lens__arrow { color: #d7e3ff; }
+.v9-lens__action:focus-visible { outline: 2px solid #c0d1ff; outline-offset: 5px; }
+.v9-lens__action:active { background: #426cbd40; }
