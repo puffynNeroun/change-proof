@@ -27,6 +27,20 @@ type Clock = { events: ClockEvent[]; elapsed: number; last: number; next: number
 export function ExperiencePrototype() {
   const [state, setState] = useState<Presentation>(initialPresentation);
   const stateRef = useRef(state);
+  const [evidenceSkipped, setEvidenceSkipped] = useState(false);
+  const evidenceRef = useRef<HTMLDivElement>(null);
+  const evidenceUnlocked = evidenceSkipped || state.phase === 'verdict' || state.phase === 'proofPacket';
+
+  function exploreEvidence() {
+    setEvidenceSkipped(true);
+    commit({ paused: true });
+    videoRef.current?.pause();
+    window.requestAnimationFrame(() => {
+      evidenceRef.current?.focus({ preventScroll: true });
+      evidenceRef.current?.scrollIntoView({ behavior: reduceMotion.current ? 'auto' : 'smooth', block: 'start' });
+    });
+  }
+
   const [fontsReady, setFontsReady] = useState(false);
   const [idleReady, setIdleReady] = useState(false);
   const [idleFailed, setIdleFailed] = useState(false);
@@ -89,15 +103,24 @@ export function ExperiencePrototype() {
   }, []);
 
   const startPreparation = useCallback((fromBoot: boolean) => {
-    const start = fromBoot ? (reduceMotion.current ? 900 : 1100) : 0;
-    const step = reduceMotion.current ? 120 : 540;
+    const simple = reduceMotion.current || window.matchMedia('(max-width: 900px), (max-height: 600px)').matches;
+    const start = fromBoot ? (simple ? 450 : 1000) : 0;
+    if (simple) {
+      startSequence([
+        { at: start, commit: () => commit({ phase: 'orientation', preparationRow: 4, replayReset: false }) },
+        { at: start + 350, commit: () => commit({ phase: 'traceReady' }) },
+      ]);
+      return;
+    }
+    // Reveal the whole object, hold its orientation, then reframe. The narrative
+    // registers only after the camera-like movement has reached its destination.
     startSequence([
       { at: start, commit: () => commit({ phase: 'orientation', preparationRow: 0 }) },
-      { at: start + 350, commit: () => commit({ preparationRow: 1, replayReset: false }) },
-      { at: start + 350 + step, commit: () => commit({ preparationRow: 2 }) },
-      { at: start + 350 + step * 2, commit: () => commit({ preparationRow: 3 }) },
-      { at: start + 350 + step * 3, commit: () => commit({ preparationRow: 4 }) },
-      { at: start + 350 + step * 3 + (reduceMotion.current ? 450 : 1100), commit: () => commit({ phase: 'traceReady' }) },
+      { at: start + 650, commit: () => commit({ preparationRow: 1, replayReset: false }) },
+      { at: start + 1450, commit: () => commit({ preparationRow: 2 }) },
+      { at: start + 2550, commit: () => commit({ preparationRow: 3 }) },
+      { at: start + 3150, commit: () => commit({ preparationRow: 4 }) },
+      { at: start + 3850, commit: () => commit({ phase: 'traceReady', traceMode: 'compact' }) },
     ]);
   }, [startSequence, commit]);
 
@@ -159,37 +182,96 @@ export function ExperiencePrototype() {
 
   function finishShipping() {
     if (stateRef.current.phase !== 'shippingTransition') return;
-    commit({ phase: 'headObservation', mediaPhase: 'head', shippingStep: 'test', headEvent: reduceMotion.current ? 'awaiting' : 'registered', headActionReady: false });
-    const motion = reduceMotion.current;
+
+    if (reduceMotion.current) {
+      commit({
+        phase: 'headObservation',
+        mediaPhase: 'head',
+        shippingStep: 'test',
+        traceMode: 'compact',
+        headEvent: 'awaiting',
+        headActionReady: false,
+      });
+      startSequence([
+        { at: 50, commit: () => commit({ headEvent: 'registered' }) },
+        { at: 160, commit: () => commit({ headEvent: 'legible' }) },
+        { at: 300, commit: () => commit({ headEvent: 'confirmed' }) },
+        { at: 460, commit: () => commit({ headEvent: 'settled', headActionReady: true }) },
+      ]);
+      return;
+    }
+
+    // Do not replace the TRACE composition in the same paint.
+    // First retract its narrative/evidence, then mount HEAD.
+    commit({
+      traceMode: 'contracting',
+      headEvent: 'awaiting',
+      headActionReady: false,
+    });
+
     startSequence([
-      { at: motion ? 50 : 0, commit: () => commit({ headEvent: 'registered' }) },
-      { at: motion ? 160 : 980, commit: () => commit({ headEvent: 'legible' }) },
-      { at: motion ? 300 : 1320, commit: () => commit({ headEvent: 'confirmed' }) },
-      { at: motion ? 460 : 1740, commit: () => commit({ headEvent: 'settled', headActionReady: true }) },
+      {
+        at: 200,
+        commit: () => commit({
+          phase: 'headObservation',
+          mediaPhase: 'head',
+          shippingStep: 'test',
+          traceMode: 'compact',
+          headEvent: 'registered',
+          headActionReady: false,
+        }),
+      },
+      { at: 1180, commit: () => commit({ headEvent: 'legible' }) },
+      { at: 1520, commit: () => commit({ headEvent: 'confirmed' }) },
+      { at: 1940, commit: () => commit({ headEvent: 'settled', headActionReady: true }) },
     ]);
   }
 
   function playShipping() {
     if (stateRef.current.phase !== 'traceReady' || actionLocked.current) return;
     actionLocked.current = true;
-    commit({ phase: 'shippingTransition', mediaPhase: reduceMotion.current ? 'head' : 'shipping', shippingStep: 'shipping', traceMode: 'retracting', headEvent: 'awaiting' });
     const video = videoRef.current;
     if (reduceMotion.current || videoState !== 'ready' || !video) {
+      commit({ phase: 'shippingTransition', mediaPhase: reduceMotion.current ? 'head' : 'shipping', shippingStep: 'shipping', traceMode: 'compact', headEvent: 'awaiting' });
       startSequence([{ at: 120, commit: finishShipping }]);
       return;
     }
+
+    // Let the opening composition leave before the trace layout and media source
+    // become visible. This avoids crossfading two incompatible geometries.
+    commit({ traceMode: 'retracting', headEvent: 'awaiting' });
     startSequence([
-      { at: 180, commit: () => commit({ traceMode: 'contracting' }) },
-      { at: 760, commit: () => commit({ traceMode: 'compact' }) },
+      { at: 240, commit: () => {
+        commit({ phase: 'shippingTransition', mediaPhase: 'shipping', shippingStep: 'shipping', traceMode: 'contracting' });
+        video.currentTime = 0;
+        video.playbackRate = finalMediaEvents.playbackRate;
+        void video.play().catch(() => { setVideoState('failed'); finishShipping(); });
+      } },
+      { at: 620, commit: () => commit({ traceMode: 'compact' }) },
     ]);
-    video.currentTime = 0;
-    video.playbackRate = finalMediaEvents.playbackRate;
-    void video.play().catch(() => { setVideoState('failed'); finishShipping(); });
   }
 
   function reviewTest() {
     if (stateRef.current.phase !== 'headObservation' || !stateRef.current.headActionReady) return;
-    commit({ phase: 'selectedTest' });
+
+    if (reduceMotion.current) {
+      commit({ phase: 'selectedTest', headActionReady: false });
+      return;
+    }
+
+    // Keep the selected test anchored while the resolved HEAD observation
+    // and its narrative leave before the selected-test phase mounts.
+    commit({ headEvent: 'exiting', headActionReady: false });
+
+    startSequence([
+      {
+        at: 200,
+        commit: () => commit({
+          phase: 'selectedTest',
+          headEvent: 'settled',
+        }),
+      },
+    ]);
   }
 
   function replayBase() {
@@ -201,12 +283,12 @@ export function ExperiencePrototype() {
       { at: 340, commit: () => commit({ replayEvent: 'registered' }) },
       { at: 460, commit: () => commit({ replayEvent: 'evaluating' }) },
       { at: 760, commit: () => commit({ replayEvent: 'observed' }) },
-      { at: 1180, commit: () => commit({ replayEvent: 'comparing' }) },
-      { at: 1300, commit: () => commit({ replayEvent: 'compared' }) },
-      { at: 1600, commit: () => commit({ replayEvent: 'localized', phase: 'mismatch' }) },
-      { at: 1820, commit: () => commit({ replayEvent: 'named' }) },
-      { at: 3820, commit: () => commit({ phase: 'verdict' }) },
-      { at: 4040, commit: () => commit({ replayEvent: 'resolved' }) },
+      { at: 2400, commit: () => commit({ replayEvent: 'comparing' }) },
+      { at: 2650, commit: () => commit({ replayEvent: 'compared' }) },
+      { at: 2900, commit: () => commit({ replayEvent: 'localized', phase: 'mismatch' }) },
+      { at: 3120, commit: () => commit({ replayEvent: 'named' }) },
+      { at: 6120, commit: () => commit({ phase: 'verdict' }) },
+      { at: 6340, commit: () => commit({ replayEvent: 'resolved' }) },
     ];
     if (reduceMotion.current) { commit({ baseEvaluated: true, baseFalseVisible: true }); startSequence(reduced); return; }
     const video = videoRef.current;
@@ -217,7 +299,7 @@ export function ExperiencePrototype() {
     video.currentTime = 0;
     video.playbackRate = finalMediaEvents.playbackRate;
     const play = () => {
-      if (stateRef.current.phase === 'baseReplay') void video.play().catch(finishBase);
+      if (stateRef.current.phase === 'baseReplay' && !stateRef.current.paused) void video.play().catch(finishBase);
     };
     video.addEventListener('loadeddata', play, { once: true });
     video.load();
@@ -227,19 +309,19 @@ export function ExperiencePrototype() {
     if (stateRef.current.phase !== 'baseReplay') return;
     commit({ mediaPhase: 'base', replayEvent: 'observed', baseEvaluated: true, baseFalseVisible: true });
     startSequence([
-      { at: 250, commit: () => commit({ replayEvent: 'comparing' }) },
-      { at: 630, commit: () => commit({ replayEvent: 'compared' }) },
-      { at: 930, commit: () => commit({ replayEvent: 'localized', phase: 'mismatch' }) },
-      { at: 1330, commit: () => commit({ replayEvent: 'named' }) },
-      { at: 3330, commit: () => commit({ phase: 'verdict' }) },
-      { at: 3930, commit: () => commit({ replayEvent: 'resolved' }) },
+      { at: 1550, commit: () => commit({ replayEvent: 'comparing' }) },
+      { at: 1800, commit: () => commit({ replayEvent: 'compared' }) },
+      { at: 2150, commit: () => commit({ replayEvent: 'localized', phase: 'mismatch' }) },
+      { at: 2450, commit: () => commit({ replayEvent: 'named' }) },
+      { at: 5600, commit: () => commit({ phase: 'verdict' }) },
+      { at: 6100, commit: () => commit({ replayEvent: 'resolved' }) },
     ]);
   }
 
   function openPacket() {
     if (stateRef.current.phase !== 'verdict' || stateRef.current.replayEvent !== 'resolved') return;
     commit({ phase: 'proofPacket', packetSettled: false, packetClosing: false, packetFolded: false });
-    startSequence([{ at: reduceMotion.current ? 80 : 850, commit: () => commit({ packetSettled: true }) }]);
+    startSequence([{ at: reduceMotion.current ? 80 : 420, commit: () => commit({ packetSettled: true }) }]);
   }
 
   function returnToVerdict() {
@@ -255,27 +337,42 @@ export function ExperiencePrototype() {
   }
 
   function replay() {
+    setEvidenceSkipped(false);
     cancelSequence();
-    videoRef.current?.pause();
-    if (videoRef.current) {
-      videoRef.current.src = ASSET.shipping;
-      videoRef.current.poster = ASSET.idle;
-      videoRef.current.currentTime = 0;
-      videoRef.current.playbackRate = finalMediaEvents.playbackRate;
-      videoRef.current.load();
-    }
-    actionLocked.current = false;
-    // Replay keeps the loaded stage and Lens mounted. Boot belongs to fresh entry only.
-    commit({ ...initialPresentation, phase: 'orientation', replayReset: true });
-    window.scrollTo(0, 0);
+
+    // Cover the currently rendered Proof Record BEFORE touching media, state,
+    // or scroll. Two RAFs ensure the opaque curtain has reached a browser paint
+    // before the light orientation state is restored underneath it.
+    commit({ replayReset: true });
+
     window.requestAnimationFrame(() => {
-      window.scrollTo(0, 0);
-      document.querySelector<HTMLElement>('.v9-production-viewport')?.focus({ preventScroll: true });
+      window.requestAnimationFrame(() => {
+        videoRef.current?.pause();
+        if (videoRef.current) {
+          videoRef.current.src = ASSET.shipping;
+          videoRef.current.poster = ASSET.idle;
+          videoRef.current.currentTime = 0;
+          videoRef.current.playbackRate = finalMediaEvents.playbackRate;
+          videoRef.current.load();
+        }
+
+        actionLocked.current = false;
+
+        // Keep the curtain opaque while the underlying opening scene resets.
+        commit({ ...initialPresentation, phase: 'orientation', replayReset: true });
+        window.scrollTo(0, 0);
+
+        window.requestAnimationFrame(() => {
+          window.scrollTo(0, 0);
+          document.querySelector<HTMLElement>('.v9-production-viewport')?.focus({ preventScroll: true });
+        });
+
+        startPreparation(false);
+      });
     });
-    startPreparation(false);
   }
   return <>
-    <V9ProductionPresentation evidence={shippingEvidence} state={state} bootError={openFailed || idleFailed || !evidenceValid} videoRef={videoRef} packetButtonRef={packetButtonRef} onIdleReady={() => setIdleReady(true)} onIdleError={() => { setIdleFailed(true); setIdleReady(true); }} onVideoReady={() => setVideoState('ready')} onVideoError={() => { if (stateRef.current.phase === 'baseReplay') finishBase(); else { setVideoState('failed'); finishShipping(); } }} onVideoTime={mediaLandmark} onVideoEnd={() => { if (stateRef.current.phase === 'baseReplay') finishBase(); else finishShipping(); }} onTrace={playShipping} onReview={reviewTest} onBase={replayBase} onPacket={openPacket} onReturn={returnToVerdict} onReplay={replay} />
-    <PostHeroContent />
+    <V9ProductionPresentation evidence={shippingEvidence} state={state} bootError={openFailed || idleFailed || !evidenceValid} videoRef={videoRef} packetButtonRef={packetButtonRef} onIdleReady={() => setIdleReady(true)} onIdleError={() => { setIdleFailed(true); setIdleReady(true); }} onVideoReady={() => setVideoState('ready')} onVideoError={() => { if (stateRef.current.phase === 'baseReplay') finishBase(); else { setVideoState('failed'); finishShipping(); } }} onVideoTime={mediaLandmark} onVideoEnd={() => { if (stateRef.current.phase === 'baseReplay') finishBase(); else finishShipping(); }} onTrace={playShipping} onReview={reviewTest} onBase={replayBase} onPacket={openPacket} onReturn={returnToVerdict} onReplay={replay} onExplore={exploreEvidence} evidenceUnlocked={evidenceUnlocked} />
+    {evidenceUnlocked && <div ref={evidenceRef} id="evidence-trace" tabIndex={-1} aria-label="Evidence trace"><PostHeroContent /></div>}
   </>;
 }
