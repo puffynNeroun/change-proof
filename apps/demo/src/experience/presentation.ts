@@ -4,7 +4,7 @@ export type ExperiencePhase =
   | 'baseReplay' | 'mismatch' | 'verdict' | 'proofPacket';
 
 export type ShippingStep = 'shipping' | 'implementation' | 'test';
-export type HeadEvent = 'awaiting' | 'registered' | 'legible' | 'confirmed' | 'settled';
+export type HeadEvent = 'awaiting' | 'registered' | 'legible' | 'confirmed' | 'settled' | 'exiting';
 export type ReplayEvent =
   | 'idle' | 'released' | 'transferring' | 'registered'
   | 'evaluating' | 'observed' | 'comparing' | 'compared'
