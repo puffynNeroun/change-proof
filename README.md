@@ -31,6 +31,8 @@ npm install -g @changeproof/cli@beta
 
 See a real generated evidence artifact: [`examples/quickstart/sample-report.md`](examples/quickstart/sample-report.md).
 
+For the engineering decisions, architecture, trade-offs, validation, and project history, see the [`Engineering Case Study`](docs/ENGINEERING_CASE_STUDY.md).
+
 ## Current status
 
 **Current v0.1 beta source/package version: `0.1.0-beta.2`**
